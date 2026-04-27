@@ -33,7 +33,7 @@ function M.save(name)
 
   local session_file = dir .. "/" .. name
 
-  -- Check if file exists
+  -- check if file exists
   if vim.fn.filereadable(session_file) == 1 then
     local choice = vim.fn.confirm("Session '" .. name .. "' already exists. Overwrite?", "&Yes\n&No", 2)
 
@@ -46,18 +46,34 @@ function M.save(name)
   local old_cwd = vim.fn.getcwd()
   local old_sessionoptions = vim.o.sessionoptions
 
+  -- capture cwd
+  local current_dir = old_cwd
+
+  -- save from project root
   vim.fn.chdir(project)
 
   vim.cmd("silent! mksession! " .. vim.fn.fnameescape(session_file))
 
-  -- Update current session
+  -- read session file
+  local lines = vim.fn.readfile(session_file)
+
+  -- persist project + desired cwd
+  local project_line = 'let g:sessman_project = "' .. project .. '"'
+  local cwd_line = 'let g:sessman_cwd = "' .. current_dir .. '"'
+
+  table.insert(lines, 1, cwd_line)
+  table.insert(lines, 1, project_line)
+
+  -- apply cwd after session loads
+  table.insert(lines, 'if exists("g:sessman_cwd") | execute "cd " . fnameescape(g:sessman_cwd) | endif')
+
+  -- write updated session file
+  vim.fn.writefile(lines, session_file)
+
+  -- update current session
   vim.v.this_session = session_file
 
-  -- -- Sync with tmux-resurrect if enabled
-  -- if cfg.tmux_integration then
-  --   require("sessman.tmux").update_tmux_resurrect_session()
-  -- end
-  --
+  -- restore original cwd and options
   vim.fn.chdir(old_cwd)
   vim.o.sessionoptions = old_sessionoptions
 
