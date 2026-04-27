@@ -17,7 +17,39 @@ function M.pick_project()
   end)
 end
 
+local function has_unsaved_buffers()
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.bo[buf].modified then
+      return true
+    end
+  end
+  return false
+end
+
 --- Pick and load a session
+local function load_session(session_file)
+  -- abort if unsaved changes exist
+  if has_unsaved_buffers() then
+    vim.notify("Unsaved changes detected. Refusing to switch session.", vim.log.levels.WARN)
+    return false
+  end
+
+  -- clean current state
+  vim.cmd.tabonly({ mods = { silent = true } })
+  vim.cmd("bufdo bwipeout")
+
+  -- load session
+  local ok, err = pcall(vim.cmd, "silent source " .. vim.fn.fnameescape(session_file))
+
+  if not ok then
+    vim.notify("Failed to load session: " .. tostring(err), vim.log.levels.ERROR)
+    return false
+  end
+
+  print("Loaded session:\n" .. session_file)
+  return true
+end
+
 function M.pick_session()
   local current_project = project.get()
   local encoded = util.encode_path(current_project)
@@ -27,18 +59,7 @@ function M.pick_session()
   local dir = base .. encoded
   local local_session = current_project .. "/Session.vim"
 
-  local function load_session(session_file)
-    local ok, err = pcall(vim.cmd, "silent source " .. vim.fn.fnameescape(session_file))
-    if not ok then
-      vim.notify("Failed to load session: " .. tostring(err), vim.log.levels.ERROR)
-      return false
-    end
-
-    print("Loaded session:\n" .. session_file)
-    return true
-  end
-
-  -- Check if session directory exists
+  -- check if session directory exists
   if vim.fn.isdirectory(dir) == 0 then
     if vim.fn.filereadable(local_session) == 1 then
       load_session(local_session)
