@@ -4,6 +4,7 @@
 local M = {}
 
 local fzf = require("fzf-lua")
+local actions = require("fzf-lua.actions")
 
 --- Pick a directory for project selection
 ---@param cb function Callback receiving the selected directory path
@@ -13,18 +14,24 @@ function M.pick_directory(cb)
   fzf.files({
     prompt = "Select Project> ",
     cwd = home,
+    hidden = false,
     fd_opts = [[
       --type d
-      --hidden
       --follow
+      --no-hidden
       --exclude .git
       --exclude node_modules
       --exclude .cache
     ]],
 
     previewer = false,
+    winopts = {
+      title = " project directory ",
+    },
 
     actions = {
+      ["ctrl-h"] = { fn = actions.toggle_hidden, reuse = true, header = false },
+
       ["default"] = function(selected, opts)
         if not selected or not selected[1] then
           return
