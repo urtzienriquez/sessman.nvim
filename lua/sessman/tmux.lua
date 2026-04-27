@@ -72,8 +72,6 @@ function M.update_tmux_resurrect_session()
     return
   end
 
-  local current_cwd = ":" .. vim.fn.getcwd()
-
   local lines = vim.fn.readfile(saved_file)
   local updated = false
   local session_command = ":" .. nvim_session_command(session_path)
@@ -86,7 +84,6 @@ function M.update_tmux_resurrect_session()
         pane
         and pane.session_name == tmux_session
         and pane.window_index == current_window_index
-        and pane.cwd == current_cwd
         and pane.command == "nvim"
       then
         pane.fields[11] = session_command
