@@ -48,15 +48,15 @@ function M.update_tmux_resurrect_session()
     return
   end
 
-  local current_window_index = tmux_output({ "tmux", "display-message", "-p", "#{window_index}" })
-  local current_pane_index = tmux_output({ "tmux", "display-message", "-p", "#{pane_index}" })
+  local current_window_index_str = tmux_output({ "tmux", "display-message", "-p", "#{window_index}" })
+  local current_pane_index_str = tmux_output({ "tmux", "display-message", "-p", "#{pane_index}" })
 
-  if not current_window_index or not current_pane_index then
+  if not current_window_index_str or not current_pane_index_str then
     return
   end
 
-  current_window_index = tonumber(current_window_index)
-  current_pane_index = tonumber(current_pane_index)
+  local current_window_index = tonumber(current_window_index_str)
+  local current_pane_index = tonumber(current_pane_index_str)
 
   if not current_window_index or not current_pane_index then
     return
