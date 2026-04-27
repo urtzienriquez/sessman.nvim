@@ -53,11 +53,11 @@ function M.save(name)
   -- Update current session
   vim.v.this_session = session_file
 
-  -- Sync with tmux-resurrect if enabled
-  if cfg.tmux_integration then
-    require("sessman.tmux").update_tmux_resurrect_session()
-  end
-
+  -- -- Sync with tmux-resurrect if enabled
+  -- if cfg.tmux_integration then
+  --   require("sessman.tmux").update_tmux_resurrect_session()
+  -- end
+  --
   vim.fn.chdir(old_cwd)
   vim.o.sessionoptions = old_sessionoptions
 

@@ -7,7 +7,6 @@ local M = {}
 ---@field backend? "fzf"|"telescope"  Picker backend (optional, auto-detected if not set)
 ---@field session_dir? string  Custom session directory (defaults to stdpath("data")/session/)
 ---@field project_detection? "auto"|"manual"  How to detect projects
----@field tmux_integration? boolean  Enable tmux-resurrect integration
 ---@field keymaps SessmanKeymapConfig
 
 ---@class SessmanKeymapConfig
@@ -25,7 +24,6 @@ M.defaults = {
   backend = nil, -- Auto-detect fzf-lua or telescope
   session_dir = nil, -- Will default to vim.fn.stdpath("data") .. "/session/"
   project_detection = "auto", -- Auto-set project on VimEnter to cwd
-  tmux_integration = true, -- Enable tmux-resurrect integration
 
   keymaps = {
     enabled = true,
@@ -35,7 +33,7 @@ M.defaults = {
     project_pick = "<leader>mp", -- SessionProjectPick
     project_clear = false, -- SessionProjectClear (no default keymap)
     current = "<leader>mc", -- SessionCurrent
-    tmux_sync = false, -- SessionTmuxSync (no default keymap)
+    tmux_sync = "<leader>mt", -- SessionTmuxSync (no default keymap)
   },
 }
 
