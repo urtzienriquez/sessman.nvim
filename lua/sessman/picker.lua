@@ -17,26 +17,40 @@ function M.pick_project()
   end)
 end
 
-local function has_unsaved_buffers()
+--- get list of unsaved (relevant) buffers
+local function get_unsaved_buffers()
+  local unsaved = {}
+
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.bo[buf].modified then
-      return true
+    if vim.bo[buf].modified and vim.bo[buf].buflisted and vim.bo[buf].buftype == "" then
+      local name = vim.api.nvim_buf_get_name(buf)
+
+      if name == "" then
+        name = "[No Name]"
+      else
+        name = vim.fn.fnamemodify(name, ":~:.")
+      end
+
+      table.insert(unsaved, name)
     end
   end
-  return false
+
+  return unsaved
 end
 
---- Pick and load a session
+--- load a session safely
 local function load_session(session_file)
   -- abort if unsaved changes exist
-  if has_unsaved_buffers() then
-    vim.notify("Unsaved changes detected. Refusing to switch session.", vim.log.levels.WARN)
+  local unsaved = get_unsaved_buffers()
+
+  if #unsaved > 0 then
+    vim.notify("Unsaved changes in:\n" .. table.concat(unsaved, "\n"), vim.log.levels.WARN, { title = "Unsaved buffers" })
     return false
   end
 
   -- clean current state
   vim.cmd.tabonly({ mods = { silent = true } })
-  vim.cmd("bufdo bwipeout")
+  vim.cmd("silent bufdo bwipeout")
 
   -- load session
   local ok, err = pcall(vim.cmd, "silent source " .. vim.fn.fnameescape(session_file))
@@ -50,6 +64,7 @@ local function load_session(session_file)
   return true
 end
 
+--- pick and load a session
 function M.pick_session()
   local current_project = project.get()
   local encoded = util.encode_path(current_project)
