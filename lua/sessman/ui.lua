@@ -39,12 +39,16 @@ function M.open()
     "Name:",
     default_name,
     "",
+    "Write shada: no",
+    "",
     "####################################################################",
     "Project: " .. project,
     "# :w marks as saved",
     "# :q exits",
     "# session only saved if written",
+    "# change 'yes' to 'no' to skip shada",
   })
+
   vim.api.nvim_win_set_cursor(0, { 2, 0 })
 
   -- never mark as modified
@@ -72,15 +76,20 @@ function M.open()
       local should_save = vim.b[buf].sessman_written
 
       local name = nil
+      local write_shada = false
+
       if should_save and vim.api.nvim_buf_is_valid(buf) then
         local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
 
         name = vim.trim(lines[2] or "")
+
+        local shada_line = vim.trim(lines[4] or ""):lower()
+        write_shada = shada_line:match("yes") ~= nil
       end
 
       vim.schedule(function()
         if should_save then
-          session.save(name)
+          session.save(name, { shada = write_shada })
         end
 
         if vim.api.nvim_buf_is_valid(buf) then

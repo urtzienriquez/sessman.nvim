@@ -11,11 +11,13 @@ end
 
 --- Save a session with the given name
 ---@param name? string Optional session name (defaults to "Session.vim")
-function M.save(name)
+---@param opts? table Optional settings { shada = boolean }
+function M.save(name, opts)
   local util = require("sessman.util")
   local project_mod = require("sessman.project")
   local cfg = require("sessman.config").get()
 
+  opts = opts or {}
   local project = project_mod.get()
 
   if vim.fn.isdirectory(project) == 0 then
@@ -73,11 +75,23 @@ function M.save(name)
   -- update current session
   vim.v.this_session = session_file
 
+  -- save shada file if requested
+  if opts.shada then
+    local shada_file = dir .. "/" .. name:gsub("%.vim$", "") .. ".shada"
+    vim.cmd("wshada! " .. vim.fn.fnameescape(shada_file))
+    -- Set shadafile option so future writes go to this session-specific shada
+    vim.o.shadafile = shada_file
+  end
+
   -- restore original cwd and options
   vim.fn.chdir(old_cwd)
   vim.o.sessionoptions = old_sessionoptions
 
-  print("Saved: " .. session_file)
+  local msg = "Saved: " .. session_file
+  if opts.shada then
+    msg = msg .. "\nShada: " .. dir .. "/" .. name:gsub("%.vim$", "") .. ".shada"
+  end
+  print(msg)
 end
 
 return M

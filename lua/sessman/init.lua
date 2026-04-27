@@ -138,6 +138,28 @@ function M.init()
   if vim.g.sessman_debug then
     require("sessman.logger").setup()
   end
+
+  -- Auto-load associated shada file when session is loaded
+  vim.api.nvim_create_autocmd("SessionLoadPost", {
+    group = vim.api.nvim_create_augroup("SessmanShada", { clear = true }),
+    callback = function()
+      local session_file = vim.v.this_session
+      if session_file == "" then
+        return
+      end
+
+      local shada_file = session_file:gsub("%.vim$", "") .. ".shada"
+      if vim.fn.filereadable(shada_file) == 1 then
+        -- Set shadafile option to use the session-specific shada
+        vim.o.shadafile = shada_file
+        -- Read the shada file
+        vim.cmd("rshada! " .. vim.fn.fnameescape(shada_file))
+      else
+        -- No associated shada file, use global shada
+        vim.o.shadafile = ""
+      end
+    end,
+  })
 end
 
 --- Setup function for user configuration
@@ -145,9 +167,9 @@ end
 function M.setup(opts)
   require("sessman.config").set(opts)
 
-    if not _initialized then
-      M.init()
-    end
+  if not _initialized then
+    M.init()
+  end
 end
 
 --- Debug helper to show current configuration

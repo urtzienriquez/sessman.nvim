@@ -44,7 +44,11 @@ local function load_session(session_file)
   local unsaved = get_unsaved_buffers()
 
   if #unsaved > 0 then
-    vim.notify("Unsaved changes in:\n" .. table.concat(unsaved, "\n"), vim.log.levels.WARN, { title = "Unsaved buffers" })
+    vim.notify(
+      "Unsaved changes in:\n" .. table.concat(unsaved, "\n"),
+      vim.log.levels.WARN,
+      { title = "Unsaved buffers" }
+    )
     return false
   end
 
@@ -87,6 +91,9 @@ function M.pick_session()
 
   -- Read session files
   local files = vim.fn.readdir(dir)
+  files = vim.tbl_filter(function(file)
+    return file:match("%.vim$")
+  end, files)
 
   if not files or #files == 0 then
     if vim.fn.filereadable(local_session) == 1 then
