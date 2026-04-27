@@ -160,6 +160,31 @@ function M.init()
       end
     end,
   })
+
+  -- Notify on VimEnter if session/shada was loaded
+  vim.api.nvim_create_autocmd("VimEnter", {
+    group = vim.api.nvim_create_augroup("SessmanNotify", { clear = true }),
+    callback = function()
+      vim.schedule(function()
+        local session_file = vim.v.this_session
+        local shada_file = vim.o.shadafile
+
+        if session_file ~= "" or shada_file ~= "" then
+          local messages = {}
+
+          if session_file ~= "" then
+            table.insert(messages, "Session: " .. vim.fn.fnamemodify(session_file, ":~:."))
+          end
+
+          if shada_file ~= "" then
+            table.insert(messages, "Shada: " .. vim.fn.fnamemodify(shada_file, ":~:."))
+          end
+
+          vim.notify(table.concat(messages, "\n"), vim.log.levels.INFO, { title = "Sessman" })
+        end
+      end)
+    end,
+  })
 end
 
 --- Setup function for user configuration
