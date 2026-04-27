@@ -1,11 +1,16 @@
+--- lua/sessman/backends/fzf.lua
+--- fzf-lua backend for sessman.nvim
+
 local M = {}
 
 local fzf = require("fzf-lua")
 
+--- Pick a directory for project selection
+---@param cb function Callback receiving the selected directory path
 function M.pick_directory(cb)
   local home = vim.fn.expand("~")
 
-  require("fzf-lua").files({
+  fzf.files({
     prompt = "Select Project> ",
     cwd = home,
     fd_opts = [[
@@ -17,7 +22,7 @@ function M.pick_directory(cb)
       --exclude .cache
     ]],
 
-    previewer = false, -- 🔥 KEY FIX
+    previewer = false,
 
     actions = {
       ["default"] = function(selected, opts)
@@ -43,10 +48,14 @@ function M.pick_directory(cb)
   })
 end
 
+--- Pick a session file
+---@param files string[] List of session filenames
+---@param dir string Directory containing the sessions
+---@param cb function Callback receiving the selected filename
 function M.pick_session(files, dir, cb)
-  require("fzf-lua").fzf_exec(files, {
+  fzf.fzf_exec(files, {
     prompt = "Sessions> ",
-    previewer = false, -- 🔥 KEY FIX
+    previewer = false,
 
     actions = {
       ["default"] = function(selected)

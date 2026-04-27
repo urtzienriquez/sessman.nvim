@@ -1,25 +1,29 @@
+--- lua/sessman/picker.lua
+--- Session and project picker using the configured backend
+
 local M = {}
 
 local project = require("sessman.project")
 local util = require("sessman.util")
+local backends = require("sessman.backends")
 
--- choose backend (for future extensibility)
-local backend = require("sessman.backends.fzf")
-
+--- Pick a project directory
 function M.pick_project()
-  backend.pick_directory(function(dir)
+  backends.call("pick_directory", function(dir)
     if not dir then
       return
     end
-    require("sessman.project").set(dir)
+    project.set(dir)
   end)
 end
 
+--- Pick and load a session
 function M.pick_session()
   local current_project = project.get()
   local encoded = util.encode_path(current_project)
 
-  local base = vim.fn.stdpath("data") .. "/session/"
+  local cfg = require("sessman.config").get()
+  local base = cfg.session_dir
   local dir = base .. encoded
   local local_session = current_project .. "/Session.vim"
 
@@ -34,6 +38,7 @@ function M.pick_session()
     return true
   end
 
+  -- Check if session directory exists
   if vim.fn.isdirectory(dir) == 0 then
     if vim.fn.filereadable(local_session) == 1 then
       load_session(local_session)
@@ -44,6 +49,7 @@ function M.pick_session()
     return
   end
 
+  -- Read session files
   local files = vim.fn.readdir(dir)
 
   if not files or #files == 0 then
@@ -56,9 +62,11 @@ function M.pick_session()
     return
   end
 
+  -- Sort by modification time
   util.sort_by_mtime(dir, files)
 
-  backend.pick_session(files, dir, function(file)
+  -- Use backend to pick session
+  backends.call("pick_session", files, dir, function(file)
     if not file then
       return
     end
