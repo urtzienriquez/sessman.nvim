@@ -168,19 +168,17 @@ function M.init()
       vim.schedule(function()
         local session_file = vim.v.this_session
         local shada_file = vim.o.shadafile
-
         if session_file ~= "" or shada_file ~= "" then
           local messages = {}
-
           if session_file ~= "" then
-            table.insert(messages, "Session: " .. vim.fn.fnamemodify(session_file, ":~:."))
+            table.insert(messages, { "Session: ", "DiagnosticHint" })
+            table.insert(messages, { session_file .. "\n", "None" })
           end
-
           if shada_file ~= "" then
-            table.insert(messages, "Shada: " .. vim.fn.fnamemodify(shada_file, ":~:."))
+            table.insert(messages, { "Shada: ", "DiagnosticHint" })
+            table.insert(messages, { shada_file, "None" })
           end
-
-          vim.notify(table.concat(messages, "\n"), vim.log.levels.INFO, { title = "Sessman" })
+          vim.api.nvim_echo(messages, false, {})
         end
       end)
     end,
