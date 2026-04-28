@@ -64,10 +64,7 @@ local function load_session(session_file)
     return false
   end
 
-  vim.api.nvim_echo({
-    { "Loaded session: ", "DiagnosticHint" },
-    { session_file, "None" },
-  }, false, {})
+  vim.api.nvim_exec_autocmds("SessionLoadPost", {})
   return true
 end
 

@@ -11,14 +11,14 @@ function M.current_session()
   if vim.v.this_session == "" then
     table.insert(msg, { "No active session\n", "DiagnosticWarn" })
   else
-    table.insert(msg, { "Current Session: ", "DiagnosticHint" })
+    table.insert(msg, { "Session: ", "DiagnosticHint" })
     table.insert(msg, { vim.v.this_session .. "\n", "None" })
   end
 
   if vim.o.shadafile == "" then
     table.insert(msg, { "Global ShaDa file", "DiagnosticWarn" })
   else
-    table.insert(msg, { "Current ShaDa: ", "DiagnosticHint" })
+    table.insert(msg, { "ShaDa: ", "DiagnosticHint" })
     table.insert(msg, { vim.o.shadafile, "None" })
   end
 

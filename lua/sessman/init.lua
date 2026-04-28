@@ -139,48 +139,30 @@ function M.init()
     require("sessman.logger").setup()
   end
 
-  -- Auto-load associated shada file when session is loaded
+  -- Notify on SessionLoadPost about session loaded
+  -- also auto-load associated shada file and notify
   vim.api.nvim_create_autocmd("SessionLoadPost", {
-    group = vim.api.nvim_create_augroup("SessmanShada", { clear = true }),
     callback = function()
       local session_file = vim.v.this_session
       if session_file == "" then
         return
       end
 
+      vim.api.nvim_echo({
+        { "Session loaded: ", "DiagnosticHint" },
+        { session_file, "None" },
+      }, false, {})
+
       local shada_file = session_file:gsub("%.vim$", "") .. ".shada"
       if vim.fn.filereadable(shada_file) == 1 then
-        -- Set shadafile option to use the session-specific shada
         vim.o.shadafile = shada_file
-        -- Read the shada file
         vim.cmd("rshada! " .. vim.fn.fnameescape(shada_file))
-      else
-        -- No associated shada file, use global shada
-        vim.o.shadafile = ""
-      end
-    end,
-  })
 
-  -- Notify on VimEnter if session/shada was loaded
-  vim.api.nvim_create_autocmd("VimEnter", {
-    group = vim.api.nvim_create_augroup("SessmanNotify", { clear = true }),
-    callback = function()
-      vim.schedule(function()
-        local session_file = vim.v.this_session
-        local shada_file = vim.o.shadafile
-        if session_file ~= "" or shada_file ~= "" then
-          local messages = {}
-          if session_file ~= "" then
-            table.insert(messages, { "Session: ", "DiagnosticHint" })
-            table.insert(messages, { session_file .. "\n", "None" })
-          end
-          if shada_file ~= "" then
-            table.insert(messages, { "Shada: ", "DiagnosticHint" })
-            table.insert(messages, { shada_file, "None" })
-          end
-          vim.api.nvim_echo(messages, false, {})
-        end
-      end)
+        vim.api.nvim_echo({
+          { "ShaDa loaded: ", "DiagnosticHint" },
+          { shada_file, "None" },
+        }, false, {})
+      end
     end,
   })
 
