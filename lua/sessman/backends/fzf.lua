@@ -86,7 +86,10 @@ function M.pick_session(files, dir, cb)
         local path = dir .. "/" .. file
 
         os.remove(path)
-        print("Deleted session: " .. file)
+        vim.api.nvim_echo({
+          { "Deleted session: ", "DiagnosticWarn" },
+          { file, "None" },
+        }, false, {})
       end,
     },
   })

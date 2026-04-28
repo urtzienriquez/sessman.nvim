@@ -2,41 +2,56 @@
 
 A Neovim session manager with project-based session organization and tmux-resurrect integration.
 
+**This is a project under development. Please, feel free to open issues or pull request.**
+
 ## Features
 
 - Project-based session organization
 - Automatic project detection
 - Integration with tmux-resurrect
 - Fuzzy session picker (fzf-lua)
-- Configurable keymaps and behavior
 
 ## Installation
 
-### lazy.nvim
+<details open>
+<summary><strong>Neovim native package manager</strong></summary>
+
+```lua
+vim.pack.add({
+      'https://github.com/urtzienriquez/sessman.nvim',
+      ... ,
+})
+
+require("sessman").setup({
+  backend = "fzf",
+})
+
+```
+
+</details> <details> <summary><strong>lazy.nvim</strong></summary>
 
 ```lua
 {
   "urtzienriquez/sessman.nvim",
-  dependencies = {
-    "ibhagwan/fzf-lua",
-  },
   config = function()
     require("sessman").setup({
       session_dir = vim.fn.stdpath("data") .. "/session/",
       project_detection = "auto", -- or "manual"
       tmux_integration = true,
-      
+
       keymaps = {
         enabled = true,
-        save = "<leader>ss",
-        load = "<leader>sl",
-        project_pick = "<leader>sp",
-        current = "<leader>sc",
+        save = "<leader>ms",
+        load = "<leader>ml",
+        project_pick = "<leader>mp",
+        current = "<leader>mc",
       },
     })
   end,
 }
 ```
+
+</details>
 
 ## Configuration
 
@@ -46,13 +61,13 @@ A Neovim session manager with project-based session organization and tmux-resurr
 require("sessman").setup({
   -- Session storage directory
   session_dir = vim.fn.stdpath("data") .. "/session/",
-  
+
   -- Project detection: "auto" sets project to cwd on VimEnter
   project_detection = "auto",
-  
+
   -- Enable tmux-resurrect integration
   tmux_integration = true,
-  
+
   keymaps = {
     enabled = true,
     save = "<leader>ms",           -- SessionSave
@@ -93,12 +108,12 @@ vim.keymap.set("n", "<leader>l", require("sessman").load)
 
 ### Default Keymaps
 
-| Key | Command | Description |
-|-----|---------|-------------|
-| `<leader>ss` | SessionSave | Save session |
-| `<leader>sl` | SessionLoad | Load session |
-| `<leader>sp` | SessionProjectPick | Pick project |
-| `<leader>sc` | SessionCurrent | Show current session |
+| Key          | Command            | Description          |
+| ------------ | ------------------ | -------------------- |
+| `<leader>ms` | SessionSave        | Save session         |
+| `<leader>ml` | SessionLoad        | Load session         |
+| `<leader>mp` | SessionProjectPick | Pick project         |
+| `<leader>mc` | SessionCurrent     | Show current session |
 
 ### API
 

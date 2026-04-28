@@ -4,9 +4,25 @@
 local M = {}
 
 --- Get the current session file path
----@return string
+-- ---@return string
 function M.current_session()
-  return vim.v.this_session
+  local msg = {}
+
+  if vim.v.this_session == "" then
+    table.insert(msg, { "No active session\n", "DiagnosticWarn" })
+  else
+    table.insert(msg, { "Current Session: ", "DiagnosticHint" })
+    table.insert(msg, { vim.v.this_session .. "\n", "None" })
+  end
+
+  if vim.o.shadafile == "" then
+    table.insert(msg, { "Global ShaDa file", "DiagnosticWarn" })
+  else
+    table.insert(msg, { "Current ShaDa: ", "DiagnosticHint" })
+    table.insert(msg, { vim.o.shadafile, "None" })
+  end
+
+  vim.api.nvim_echo(msg, false, {})
 end
 
 --- Save a session with the given name
@@ -76,8 +92,8 @@ function M.save(name, opts)
   vim.v.this_session = session_file
 
   -- save shada file if requested
+  local shada_file = dir .. "/" .. name:gsub("%.vim$", "") .. ".shada"
   if opts.shada then
-    local shada_file = dir .. "/" .. name:gsub("%.vim$", "") .. ".shada"
     vim.cmd("wshada! " .. vim.fn.fnameescape(shada_file))
     -- Set shadafile option so future writes go to this session-specific shada
     vim.o.shadafile = shada_file
@@ -87,11 +103,16 @@ function M.save(name, opts)
   vim.fn.chdir(old_cwd)
   vim.o.sessionoptions = old_sessionoptions
 
-  local msg = "Saved: " .. session_file
+  vim.api.nvim_echo({
+    { "Saved Session: ", "DiagnosticHint" },
+    { session_file, "None" },
+  }, false, {})
   if opts.shada then
-    msg = msg .. "\nShada: " .. dir .. "/" .. name:gsub("%.vim$", "") .. ".shada"
+    vim.api.nvim_echo({
+      { "Saved ShaDa: ", "DiagnosticHint" },
+      { shada_file, "None" },
+    }, false, {})
   end
-  print(msg)
 end
 
 return M

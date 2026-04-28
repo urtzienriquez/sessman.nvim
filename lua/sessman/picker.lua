@@ -64,7 +64,10 @@ local function load_session(session_file)
     return false
   end
 
-  print("Loaded session:\n" .. session_file)
+  vim.api.nvim_echo({
+    { "Loaded session: ", "DiagnosticHint" },
+    { session_file, "None" },
+  }, false, {})
   return true
 end
 
@@ -85,7 +88,9 @@ function M.pick_session()
       return
     end
 
-    print("No sessions for this project: " .. dir)
+    vim.api.nvim_echo({
+      { "No sessions for this project: " .. dir, "DiagnosticWarn" },
+    }, false, {})
     return
   end
 
@@ -101,7 +106,9 @@ function M.pick_session()
       return
     end
 
-    print("No sessions found in: " .. dir)
+    vim.api.nvim_echo({
+      { "No sessions found in: " .. dir, "DiagnosticWarn" },
+    }, false, {})
     return
   end
 

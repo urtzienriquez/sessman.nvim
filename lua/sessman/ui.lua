@@ -20,10 +20,6 @@ function M.open()
   vim.bo[buf].readonly = false
   vim.bo[buf].modified = false
 
-  vim.wo.number = false
-  vim.wo.relativenumber = false
-  vim.wo.signcolumn = "no"
-
   vim.b[buf].sessman_written = false
 
   local project = project_mod.get()
@@ -35,21 +31,62 @@ function M.open()
     default_name = vim.fn.fnamemodify(current_session, ":t")
   end
 
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
-    "Name:",
-    default_name,
+  local content = {
+    "Session",
     "",
-    "Write shada: no",
+    "Name:        " .. default_name,
+    "Write shada? no",
     "",
-    "####################################################################",
+    "────────────────────────────────────────",
     "Project: " .. project,
     "# :w marks as saved",
     "# :q exits",
     "# session only saved if written",
     "# change 'yes' to 'no' to skip shada",
-  })
+  }
 
-  vim.api.nvim_win_set_cursor(0, { 2, 0 })
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, content)
+
+  -- highlights
+  local ns = vim.api.nvim_create_namespace("sessman")
+
+  local function hi(line, col_start, col_end, group)
+    if col_end == -1 then
+      local text = vim.api.nvim_buf_get_lines(buf, line, line + 1, false)[1] or ""
+      col_end = #text
+    end
+
+    vim.api.nvim_buf_set_extmark(buf, ns, line, col_start, {
+      end_col = col_end,
+      hl_group = group,
+    })
+  end
+
+  local function hi_match(line, pattern, group)
+    local text = vim.api.nvim_buf_get_lines(buf, line, line + 1, false)[1] or ""
+    local s, e = text:find(pattern)
+
+    if s then
+      vim.api.nvim_buf_set_extmark(buf, ns, line, s - 1, {
+        end_col = e,
+        hl_group = group,
+      })
+    end
+  end
+
+  hi(0, 0, -1, "SessmanTitle")
+  hi_match(2, "Name:", "SessmanLabel")
+  hi_match(2, default_name, "SessmanValue")
+  hi_match(3, "Write shada%?", "SessmanLabel")
+  hi_match(3, "%f[%w]no%f[%W]", "SessmanBoolean")
+  hi(5, 0, -1, "SessmanSeparator")
+  hi_match(6, "Project:", "SessmanLabel")
+  hi_match(6, project, "SessmanValue")
+  for i = 7, #content - 1 do
+    hi(i, 0, -1, "SessmanComment")
+  end
+
+  vim.api.nvim_win_set_cursor(0, { 3, 13 })
 
   -- never mark as modified
   vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {

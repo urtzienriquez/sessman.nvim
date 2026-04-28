@@ -43,7 +43,7 @@ end
 
 --- Show the current session file path
 function M.current()
-  print(require("sessman.session").current_session())
+  require("sessman.session").current_session()
 end
 
 --- Sync session with tmux-resurrect
@@ -183,6 +183,15 @@ function M.init()
           vim.notify(table.concat(messages, "\n"), vim.log.levels.INFO, { title = "Sessman" })
         end
       end)
+    end,
+  })
+
+  -- set highlight groups
+  require("sessman.highlights").setup()
+
+  vim.api.nvim_create_autocmd("ColorScheme", {
+    callback = function()
+      require("sessman.highlights").setup()
     end,
   })
 end
