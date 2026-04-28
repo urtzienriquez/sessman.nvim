@@ -155,20 +155,45 @@ function M.delete(file, dir, on_deleted)
     end
 
     local path = dir .. "/" .. file
-    os.remove(path)
-    vim.api.nvim_echo({
-      { "Deleted Session: ", "DiagnosticWarn" },
-      { file, "None" },
-    }, false, {})
+
+    -- if currently active session, clear it first
+    if vim.v.this_session == path then
+      vim.v.this_session = ""
+    end
+
+    local success, err = os.remove(path)
+    if success then
+      vim.api.nvim_echo({
+        { "Deleted Session: ", "DiagnosticWarn" },
+        { file, "None" },
+      }, false, {})
+    else
+      vim.api.nvim_echo({
+        { "Failed to delete session: ", "DiagnosticError" },
+        { err or "unknown error", "None" },
+      }, false, {})
+    end
 
     local base = file:gsub("%.vim$", "")
     local shada_path = dir .. "/" .. base .. ".shada"
     if vim.fn.filereadable(shada_path) == 1 then
-      os.remove(shada_path)
-      vim.api.nvim_echo({
-        { "Deleted ShaDa: ", "DiagnosticWarn" },
-        { base .. ".shada", "None" },
-      }, false, {})
+      -- if this is the currently active ShaDa file, switch to global first
+      if vim.o.shadafile == shada_path then
+        vim.o.shadafile = ""
+      end
+
+      local shada_success, shada_err = os.remove(shada_path)
+      if shada_success then
+        vim.api.nvim_echo({
+          { "Deleted ShaDa: ", "DiagnosticWarn" },
+          { base .. ".shada", "None" },
+        }, false, {})
+      else
+        vim.api.nvim_echo({
+          { "Failed to delete ShaDa: ", "DiagnosticError" },
+          { shada_err or "unknown error", "None" },
+        }, false, {})
+      end
     end
 
     -- if directory is now empty remove it
