@@ -118,7 +118,8 @@ function M.open()
       if should_save and vim.api.nvim_buf_is_valid(buf) then
         local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
 
-        name = vim.trim(lines[2] or "")
+        local name_line = lines[3] or ""
+        name = vim.trim(name_line:match("^Name:%s*(.+)$") or "")
 
         local shada_line = vim.trim(lines[4] or ""):lower()
         write_shada = shada_line:match("yes") ~= nil
