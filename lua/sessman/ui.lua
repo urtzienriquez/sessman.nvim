@@ -42,7 +42,7 @@ function M.open()
     "# :w marks as saved",
     "# :q exits",
     "# session only saved if written",
-    "# change 'yes' to 'no' to skip shada",
+    "# change 'no' to 'yes' to save shada",
   }
 
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, content)
