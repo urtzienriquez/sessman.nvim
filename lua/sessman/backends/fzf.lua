@@ -63,34 +63,52 @@ function M.pick_session(files, dir, cb)
   fzf.fzf_exec(files, {
     prompt = "Sessions> ",
     previewer = false,
-
     actions = {
       ["default"] = function(selected)
         if not selected or not selected[1] then
           return
         end
-
         local file = selected[1]
-
         vim.schedule(function()
           cb(file)
         end)
       end,
+      ["ctrl-d"] = {
+        fn = function(selected, opts)
+          if not selected or not selected[1] then
+            return
+          end
+          local file = selected[1]
+          vim.ui.select({ "No", "Yes" }, {
+            prompt = "Delete '" .. file .. "'?",
+          }, function(choice)
+            if choice ~= "Yes" then
+              return
+            end
+            local path = dir .. "/" .. file
+            os.remove(path)
+            local base = file:gsub("%.vim$", "")
+            local shada_path = dir .. "/" .. base .. ".shada"
+            if vim.fn.filereadable(shada_path) == 1 then
+              os.remove(shada_path)
+            end
+            vim.api.nvim_echo({
+              { "Deleted: ", "DiagnosticWarn" },
+              { file, "None" },
+            }, false, {})
 
-      ["ctrl-d"] = function(selected)
-        if not selected or not selected[1] then
-          return
-        end
+            -- Get updated file list and reopen picker
+            local updated_files = vim.fn.readdir(dir)
+            updated_files = vim.tbl_filter(function(f)
+              return f:match("%.vim$")
+            end, updated_files)
 
-        local file = selected[1]
-        local path = dir .. "/" .. file
-
-        os.remove(path)
-        vim.api.nvim_echo({
-          { "Deleted session: ", "DiagnosticWarn" },
-          { file, "None" },
-        }, false, {})
-      end,
+            M.pick_session(updated_files, dir, cb)
+          end)
+        end,
+        reload = true,
+        reuse = true,
+      },
     },
   })
 end
