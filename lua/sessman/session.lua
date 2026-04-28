@@ -142,4 +142,49 @@ function M.save(name, opts)
   do_save(name, opts)
 end
 
+--- Delete a session file
+---@param file string Session filename
+---@param dir string Directory containing the session
+---@param on_deleted? function Optional callback called after successful deletion
+function M.delete(file, dir, on_deleted)
+  vim.ui.select({ "No", "Yes" }, {
+    prompt = "Delete '" .. file .. "'?",
+  }, function(choice)
+    if choice ~= "Yes" then
+      return
+    end
+
+    local path = dir .. "/" .. file
+    os.remove(path)
+    vim.api.nvim_echo({
+      { "Deleted Session: ", "DiagnosticWarn" },
+      { file, "None" },
+    }, false, {})
+
+    local base = file:gsub("%.vim$", "")
+    local shada_path = dir .. "/" .. base .. ".shada"
+    if vim.fn.filereadable(shada_path) == 1 then
+      os.remove(shada_path)
+      vim.api.nvim_echo({
+        { "Deleted ShaDa: ", "DiagnosticWarn" },
+        { base .. ".shada", "None" },
+      }, false, {})
+    end
+
+    -- if directory is now empty remove it
+    local remaining_files = vim.fn.readdir(dir)
+    if #remaining_files == 0 then
+      vim.fn.delete(dir, "d")
+      vim.api.nvim_echo({
+        { "Removed empty session directory", "DiagnosticInfo" },
+      }, false, {})
+    end
+
+    -- Notify caller that deletion succeeded
+    if on_deleted then
+      on_deleted()
+    end
+  end)
+end
+
 return M

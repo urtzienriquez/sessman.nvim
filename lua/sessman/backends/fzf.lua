@@ -74,30 +74,23 @@ function M.pick_session(files, dir, cb)
         end)
       end,
       ["ctrl-d"] = {
-        fn = function(selected, opts)
+        fn = function(selected)
           if not selected or not selected[1] then
             return
           end
           local file = selected[1]
-          vim.ui.select({ "No", "Yes" }, {
-            prompt = "Delete '" .. file .. "'?",
-          }, function(choice)
-            if choice ~= "Yes" then
+          local session_mod = require("sessman.session")
+
+          session_mod.delete(file, dir, function()
+            -- check if directory still exists
+            if vim.fn.isdirectory(dir) == 0 then
+              -- if last session removed, close the picker by sending esc key
+              vim.schedule(function()
+                vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "n", false)
+              end)
               return
             end
-            local path = dir .. "/" .. file
-            os.remove(path)
-            local base = file:gsub("%.vim$", "")
-            local shada_path = dir .. "/" .. base .. ".shada"
-            if vim.fn.filereadable(shada_path) == 1 then
-              os.remove(shada_path)
-            end
-            vim.api.nvim_echo({
-              { "Deleted: ", "DiagnosticWarn" },
-              { file, "None" },
-            }, false, {})
 
-            -- Get updated file list and reopen picker
             local updated_files = vim.fn.readdir(dir)
             updated_files = vim.tbl_filter(function(f)
               return f:match("%.vim$")
