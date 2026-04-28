@@ -28,7 +28,7 @@ end
 --- Save a session with the given name
 ---@param name? string Optional session name (defaults to "Session.vim")
 ---@param opts? table Optional settings { shada = boolean }
-function M.save(name, opts)
+local function do_save(name, opts)
   local util = require("sessman.util")
   local project_mod = require("sessman.project")
   local cfg = require("sessman.config").get()
@@ -50,16 +50,6 @@ function M.save(name, opts)
   vim.fn.mkdir(dir, "p")
 
   local session_file = dir .. "/" .. name
-
-  -- check if file exists
-  if vim.fn.filereadable(session_file) == 1 then
-    local choice = vim.fn.confirm("Session '" .. name .. "' already exists. Overwrite?", "&Yes\n&No", 2)
-
-    if choice ~= 1 then
-      print("Session not saved")
-      return
-    end
-  end
 
   local old_cwd = vim.fn.getcwd()
   local old_sessionoptions = vim.o.sessionoptions
@@ -113,6 +103,43 @@ function M.save(name, opts)
       { shada_file, "None" },
     }, false, {})
   end
+end
+
+function M.save(name, opts)
+  local util = require("sessman.util")
+  local project_mod = require("sessman.project")
+  local cfg = require("sessman.config").get()
+
+  opts = opts or {}
+  local project = project_mod.get()
+
+  if vim.fn.isdirectory(project) == 0 then
+    print("Invalid project path")
+    return
+  end
+
+  name = (name and name ~= "") and name or "Session.vim"
+
+  local encoded = util.encode_path(project)
+  local dir = cfg.session_dir .. encoded
+  local session_file = dir .. "/" .. name
+
+  -- file exists → confirm
+  if vim.fn.filereadable(session_file) == 1 then
+    vim.ui.select({ "No", "Yes" }, {
+      prompt = "Session '" .. name .. "' already exists. Overwrite?",
+    }, function(choice)
+      if choice == "Yes" then
+        do_save(name, opts)
+      else
+        print("Session not saved")
+      end
+    end)
+    return
+  end
+
+  -- file does not exist → save directly
+  do_save(name, opts)
 end
 
 return M
