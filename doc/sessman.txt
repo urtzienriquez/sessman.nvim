@@ -1,0 +1,24 @@
+*sessman.txt* Session Manager for Neovim
+
+==============================================================================
+INTRODUCTION                                                        *sessman*
+
+Sessman is a lightweight session manager designed to mimic the UI patterns
+of vim-fugitive. It provides a dedicated buffer to manage session state,
+project context, and shada settings.
+
+==============================================================================
+MAPPINGS                                                       *sessman-maps*
+
+These mappings are available in the sessman buffer:
+
+<CR>            Toggle the option under the cursor. If on the "Name" line,
+                it opens an input prompt to rename the session.
+s               Save the current session with the displayed settings.
+q               Close the sessman buffer.
+g?              Open this help documentation at the maps section.
+]c              Jump to the next configuration section.
+[c              Jump to the previous configuration section.
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl:
