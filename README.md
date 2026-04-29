@@ -9,7 +9,8 @@ A Neovim session manager with project-based session organization and tmux-resurr
 - Project-based session organization
 - Automatic project detection
 - Integration with tmux-resurrect
-- Fuzzy session picker (fzf-lua)
+- Multiple backend support (fzf-lua, telescope, mini.pick, snacks)
+- Interactive UI buffer for session management
 
 ## Installation
 
@@ -23,7 +24,7 @@ vim.pack.add({
 })
 
 require("sessman").setup({
-  backend = "fzf",
+  backend = "fzf",  -- or "telescope", "minipick", "snacks", or nil (auto-detect)
 })
 
 ```
@@ -35,6 +36,7 @@ require("sessman").setup({
   "urtzienriquez/sessman.nvim",
   config = function()
     require("sessman").setup({
+      backend = "fzf",  -- or "telescope", "minipick", "snacks", or nil (auto-detect)
       session_dir = vim.fn.stdpath("data") .. "/session/",
       project_detection = "auto", -- or "manual"
 
@@ -59,6 +61,9 @@ require("sessman").setup({
 
 ```lua
 require("sessman").setup({
+  -- Picker backend: "fzf", "telescope", "minipick", "snacks", or nil (auto-detect)
+  backend = nil,
+
   -- Session storage directory
   session_dir = vim.fn.stdpath("data") .. "/session/",
 
@@ -94,7 +99,7 @@ vim.keymap.set("n", "<leader>l", require("sessman").load)
 
 ### Commands
 
-- `:SessionSave` - Save current session (opens UI to name it)
+- `:SessionSave` - Save current session (opens interactive UI)
 - `:SessionLoad` - Load a session via picker
 - `:SessionProjectSet [path]` - Set project directory
 - `:SessionProjectPick` - Pick project directory via picker
@@ -102,6 +107,22 @@ vim.keymap.set("n", "<leader>l", require("sessman").load)
 - `:SessionCurrent` - Show current session file path
 - `:SessionTmuxSync` - Sync with tmux-resurrect
 - `:SessionDebugStart` / `:SessionDebugStop` - Toggle debug logging
+
+### Interactive UI
+
+When you run `:SessionSave`, an interactive buffer opens where you can:
+
+- **`<CR>`** - Toggle options or edit the session name
+- **`s`** - Save the session with current settings
+- **`q`** - Close the UI
+- **`g?`** - Open help documentation
+- **`]c` / `[c`** - Jump between configuration sections
+
+The UI allows you to:
+
+- Name your session
+- Choose whether to save ShaDa data with the session
+- See the current project directory
 
 ### Default Keymaps
 
@@ -150,6 +171,17 @@ Project paths are encoded (using `%` as separator) to create unique session dire
 
 - **Auto mode** (default): Sets project to `cwd` on `VimEnter`
 - **Manual mode**: Use `:SessionProjectSet` or `:SessionProjectPick`
+
+### Backend Support
+
+sessman automatically detects and uses available picker backends:
+
+- **fzf-lua** - Fast and feature-rich (recommended)
+- **telescope** - Popular picker with extensive features
+- **mini.pick** - Minimal and lightweight
+- **snacks** - Modern picker interface
+
+If no backend is specified in configuration, sessman will auto-detect in this order: fzf-lua → telescope → mini.pick → snacks.
 
 ### tmux-resurrect Integration
 

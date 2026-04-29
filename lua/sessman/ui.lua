@@ -148,7 +148,7 @@ function M.open()
   end, opts)
 
   vim.keymap.set("n", "q", "<Cmd>close<CR>", opts)
-  vim.keymap.set("n", "g?", "<Cmd>help sessman-maps<CR>", opts)
+  vim.keymap.set("n", "g?", "<Cmd>help sessman-ui-maps<CR>", opts)
   vim.keymap.set("n", "]c", function()
     vim.fn.search([[\v^\w+:]], "W")
   end, opts)
