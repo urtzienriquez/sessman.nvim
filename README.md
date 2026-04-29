@@ -161,7 +161,7 @@ When you run `:SessionTmuxSync` (or use the keymap), sessman:
 
 1. **Verifies you're inside tmux** - Shows a warning if not
 2. **Checks for an active Neovim session** - You need to save a session first with `:SessionSave`
-3. **Finds the tmux-resurrect save file** - Automatically detects both the original tmux-resurrect [link](https://github.com/tmux-plugins/tmux-resurrect) and [my forked version](https://github.com/urtzienriquez/tmux-resurrect) of tmux-resurrect.
+3. **Finds the tmux-resurrect save file** - Automatically detects both the [original tmux-resurrect](https://github.com/tmux-plugins/tmux-resurrect) and [my forked version of tmux-resurrect](https://github.com/urtzienriquez/tmux-resurrect).
 4. **Updates the resurrect file** - Modifies the pane entry for your current tmux pane to include the Neovim session path
 
 After syncing, when tmux-resurrect restores your environment, the Neovim pane will automatically load with `nvim -S /path/to/your/session.vim`.
