@@ -37,7 +37,6 @@ require("sessman").setup({
     require("sessman").setup({
       session_dir = vim.fn.stdpath("data") .. "/session/",
       project_detection = "auto", -- or "manual"
-      tmux_integration = true,
 
       keymaps = {
         enabled = true,
@@ -45,6 +44,7 @@ require("sessman").setup({
         load = "<leader>ml",
         project_pick = "<leader>mp",
         current = "<leader>mc",
+        tmux_sync = "<leader>mt",  -- optional: sync with tmux-resurrect
       },
     })
   end,
@@ -65,9 +65,6 @@ require("sessman").setup({
   -- Project detection: "auto" sets project to cwd on VimEnter
   project_detection = "auto",
 
-  -- Enable tmux-resurrect integration
-  tmux_integration = true,
-
   keymaps = {
     enabled = true,
     save = "<leader>ms",           -- SessionSave
@@ -76,7 +73,7 @@ require("sessman").setup({
     project_pick = "<leader>mp",   -- SessionProjectPick
     project_clear = false,         -- SessionProjectClear (no default)
     current = "<leader>mc",        -- SessionCurrent
-    tmux_sync = false,             -- SessionTmuxSync (no default)
+    tmux_sync = "<leader>mt",      -- SessionTmuxSync
   },
 })
 ```
@@ -108,25 +105,26 @@ vim.keymap.set("n", "<leader>l", require("sessman").load)
 
 ### Default Keymaps
 
-| Key          | Command            | Description          |
-| ------------ | ------------------ | -------------------- |
-| `<leader>ms` | SessionSave        | Save session         |
-| `<leader>ml` | SessionLoad        | Load session         |
-| `<leader>mp` | SessionProjectPick | Pick project         |
-| `<leader>mc` | SessionCurrent     | Show current session |
+| Key          | Command            | Description              |
+| ------------ | ------------------ | ------------------------ |
+| `<leader>ms` | SessionSave        | Save session             |
+| `<leader>ml` | SessionLoad        | Load session             |
+| `<leader>mp` | SessionProjectPick | Pick project             |
+| `<leader>mc` | SessionCurrent     | Show current session     |
+| `<leader>mt` | SessionTmuxSync    | Sync with tmux-resurrect |
 
 ### API
 
 ```lua
 local sessman = require("sessman")
 
-sessman.save()           -- Save session
-sessman.load()           -- Load session
-sessman.project_pick()   -- Pick project
+sessman.save()            -- Save session
+sessman.load()            -- Load session
+sessman.project_pick()    -- Pick project
 sessman.project_set(path) -- Set project
-sessman.current()        -- Show current session
-sessman.tmux_sync()      -- Sync tmux-resurrect
-sessman.debug()          -- Show configuration
+sessman.current()         -- Show current session
+sessman.tmux_sync()       -- Sync tmux-resurrect
+sessman.debug()           -- Show configuration
 ```
 
 ## How It Works
@@ -137,11 +135,11 @@ Sessions are stored in a project-based directory structure:
 
 ```
 ~/.local/share/nvim/session/
-├── home%user%projects%myproject/
+├── %home%user%projects%myproject/
 │   ├── Session.vim
 │   ├── feature-branch.vim
 │   └── bugfix.vim
-└── home%user%work%client/
+└── %home%user%work%client/
     ├── Session.vim
     └── development.vim
 ```
@@ -155,7 +153,38 @@ Project paths are encoded (using `%` as separator) to create unique session dire
 
 ### tmux-resurrect Integration
 
-When `tmux_integration = true`, sessman automatically updates your tmux-resurrect session file to restore Neovim with the correct session when tmux restores.
+sessman can sync your Neovim session with tmux-resurrect, so when tmux restores your environment, Neovim automatically loads the correct session.
+
+#### How It Works
+
+When you run `:SessionTmuxSync` (or use the keymap), sessman:
+
+1. **Verifies you're inside tmux** - Shows a warning if not
+2. **Checks for an active Neovim session** - You need to save a session first with `:SessionSave`
+3. **Finds the tmux-resurrect save file** - Automatically detects both the original tmux-resurrect [link](https://github.com/tmux-plugins/tmux-resurrect) and [my forked version](https://github.com/urtzienriquez/tmux-resurrect) of tmux-resurrect.
+4. **Updates the resurrect file** - Modifies the pane entry for your current tmux pane to include the Neovim session path
+
+After syncing, when tmux-resurrect restores your environment, the Neovim pane will automatically load with `nvim -S /path/to/your/session.vim`.
+
+#### Compatibility
+
+sessman automatically detects and supports both:
+
+- **Original tmux-resurrect**: Uses a single timestamped file with a `last` symlink
+  - Location: `~/.local/share/tmux/resurrect/last` → `tmux_resurrect_TIMESTAMP.txt`
+- **My fork of tmux-resurrect**: Uses per-session files in a `saved/` directory
+  - Location: `~/.local/share/tmux/resurrect/saved/session_name.resurrect`
+
+The sync command will find the correct file automatically without any configuration needed.
+
+#### Requirements
+
+- You must be running Neovim inside a tmux session
+- [tmux-resurrect](https://github.com/tmux-plugins/tmux-resurrect) must be installed
+- Your tmux session must be saved at least once with tmux-resurrect
+- You must have an active Neovim session (saved with `:SessionSave`)
+
+All checks are performed automatically with helpful error messages if something is missing.
 
 ## License
 
