@@ -48,7 +48,12 @@ end
 
 --- Sync session with tmux-resurrect
 function M.tmux_sync()
-  require("sessman.tmux").update_tmux_resurrect_session()
+  local tmux = require("sessman.tmux")
+  if not tmux.is_inside_tmux() then
+    vim.notify("tmux-resurrect sync requires running Neovim inside a tmux session", vim.log.levels.WARN)
+    return
+  end
+  tmux.update_tmux_resurrect_session()
 end
 
 --- Enable debug logging

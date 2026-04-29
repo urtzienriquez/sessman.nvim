@@ -1,5 +1,10 @@
 local M = {}
 
+---@return boolean
+function M.is_inside_tmux()
+  return vim.env.TMUX ~= nil and vim.env.TMUX ~= ""
+end
+
 local function nvim_session_command(session_path)
   local escaped = session_path:gsub("%%", "\\%%")
   return "nvim -S '" .. escaped .. "'"
@@ -38,8 +43,14 @@ local function parse_resurrect_pane(line)
 end
 
 function M.update_tmux_resurrect_session()
+  if not M.is_inside_tmux() then
+    vim.notify("Not running inside a tmux session", vim.log.levels.WARN)
+    return
+  end
+
   local resurrect_dir = tmux_output({ "tmux", "show-option", "-gqv", "@resurrect-dir" })
   if not resurrect_dir or resurrect_dir == "" then
+    vim.notify("tmux-resurrect is not configured or @resurrect-dir option is not set", vim.log.levels.WARN)
     return
   end
 
@@ -64,11 +75,16 @@ function M.update_tmux_resurrect_session()
 
   local session_path = vim.v.this_session
   if session_path == "" then
+    vim.notify("No active Neovim session to sync.\n" .. "Save or load a session first", vim.log.levels.WARN)
     return
   end
 
   local saved_file = resurrect_dir .. "/saved/" .. tmux_session .. ".resurrect"
   if vim.fn.filereadable(saved_file) == 0 then
+    vim.notify(
+      "tmux session '" .. tmux_session .. "' has not been saved by tmux-resurrect.\n" .. "Skipped sync.",
+      vim.log.levels.WARN
+    )
     return
   end
 
@@ -96,9 +112,13 @@ function M.update_tmux_resurrect_session()
 
   if updated then
     vim.fn.writefile(lines, saved_file)
-    vim.notify("Updated tmux resurrect for current pane")
+    vim.api.nvim_echo({
+      { "Synced nvim - tmux resurrect for current pane", "DiagnosticInfo" },
+    }, false, {})
   else
-    vim.notify("No matching pane found in resurrect file", vim.log.levels.WARN)
+    vim.api.nvim_echo({
+      { "No matching pane found in resurrect file", "DiagnosticWarn" },
+    }, false, {})
   end
 end
 
