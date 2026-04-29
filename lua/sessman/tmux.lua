@@ -24,7 +24,6 @@ local function parse_resurrect_pane(line)
     return nil
   end
 
-  -- Correct field positions (based on your file)
   local window_index = tonumber(fields[3])
   local pane_index = tonumber(fields[4])
 
@@ -42,15 +41,35 @@ local function parse_resurrect_pane(line)
   }
 end
 
+---@return string|nil
+local function get_resurrect_dir()
+  -- try the configured option
+  local dir = tmux_output({ "tmux", "show-option", "-gqv", "@resurrect-dir" })
+
+  if dir and dir ~= "" then
+    return dir
+  end
+
+  -- Fall back to default directories
+  local tmux_dir = vim.fn.expand("~/.tmux/resurrect")
+  if vim.fn.isdirectory(tmux_dir) == 1 then
+    return tmux_dir
+  end
+
+  -- Use XDG_DATA_HOME or default to ~/.local/share
+  local xdg_data = vim.env.XDG_DATA_HOME or vim.fn.expand("~/.local/share")
+  return xdg_data .. "/tmux/resurrect"
+end
+
 function M.update_tmux_resurrect_session()
   if not M.is_inside_tmux() then
     vim.notify("Not running inside a tmux session", vim.log.levels.WARN)
     return
   end
 
-  local resurrect_dir = tmux_output({ "tmux", "show-option", "-gqv", "@resurrect-dir" })
-  if not resurrect_dir or resurrect_dir == "" then
-    vim.notify("tmux-resurrect is not configured or @resurrect-dir option is not set", vim.log.levels.WARN)
+  local resurrect_dir = get_resurrect_dir()
+  if not resurrect_dir then
+    vim.notify("Could not determine tmux-resurrect directory", vim.log.levels.WARN)
     return
   end
 
@@ -79,12 +98,26 @@ function M.update_tmux_resurrect_session()
     return
   end
 
-  local saved_file = resurrect_dir .. "/saved/" .. tmux_session .. ".resurrect"
-  if vim.fn.filereadable(saved_file) == 0 then
-    vim.notify(
-      "tmux session '" .. tmux_session .. "' has not been saved by tmux-resurrect.\n" .. "Skipped sync.",
-      vim.log.levels.WARN
-    )
+  -- detect which version of tmux-resurrect is being used
+  local saved_dir = resurrect_dir .. "/saved"
+  local last_symlink = resurrect_dir .. "/last"
+  local saved_file
+
+  if vim.fn.isdirectory(saved_dir) == 1 then
+    -- fork version: per-session files in saved/ directory
+    saved_file = saved_dir .. "/" .. tmux_session .. ".resurrect"
+    if vim.fn.filereadable(saved_file) == 0 then
+      vim.notify(
+        "tmux session '" .. tmux_session .. "' has not been saved by tmux-resurrect.\n" .. "Skipped sync.",
+        vim.log.levels.WARN
+      )
+      return
+    end
+  elseif vim.fn.filereadable(last_symlink) == 1 then
+    -- Original version: single file with all sessions, 'last' symlink
+    saved_file = last_symlink
+  else
+    vim.notify("No tmux-resurrect save file found.\n" .. "Save your tmux session first", vim.log.levels.WARN)
     return
   end
 
