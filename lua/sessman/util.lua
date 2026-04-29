@@ -15,4 +15,34 @@ function M.sort_by_mtime(dir, files)
   end)
 end
 
+function M.get_dirs(opts)
+  opts = opts or {}
+
+  local home = vim.fn.expand("~")
+
+  local cmd = {
+    "fdfind",
+    "--type",
+    "d",
+    "--follow",
+    "--exclude",
+    ".git",
+    "--exclude",
+    "node_modules",
+    "--exclude",
+    ".cache",
+  }
+
+  if opts.hidden then
+    table.insert(cmd, "--hidden")
+  else
+    table.insert(cmd, "--no-hidden")
+  end
+
+  table.insert(cmd, ".")
+  table.insert(cmd, home)
+
+  return vim.fn.systemlist(cmd)
+end
+
 return M

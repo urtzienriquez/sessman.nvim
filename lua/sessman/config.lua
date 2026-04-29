@@ -4,7 +4,7 @@
 local M = {}
 
 ---@class SessmanConfig
----@field backend? "fzf"|"telescope"  Picker backend (optional, auto-detected if not set)
+---@field backend? "fzf"|"telescope"|"minipick"|"snacks"  Picker backend (optional, auto-detected if not set)
 ---@field session_dir? string  Custom session directory (defaults to stdpath("data")/session/)
 ---@field project_detection? "auto"|"manual"  How to detect projects
 ---@field keymaps SessmanKeymapConfig
@@ -21,7 +21,7 @@ local M = {}
 
 ---@type SessmanConfig
 M.defaults = {
-  backend = nil, -- Auto-detect fzf-lua or telescope
+  backend = nil, -- Auto-detect fzf-lua, telescope, minipick or snacks
   session_dir = nil, -- Will default to vim.fn.stdpath("data") .. "/session/"
   project_detection = "auto", -- Auto-set project on VimEnter to cwd
 
@@ -52,12 +52,18 @@ function M.set(opts)
   end
 
   -- Validate backend if provided
-  if M.options.backend and M.options.backend ~= "fzf" and M.options.backend ~= "telescope" then
+  if
+    M.options.backend
+    and M.options.backend ~= "fzf"
+    and M.options.backend ~= "minipick"
+    and M.options.backend ~= "snacks"
+    and M.options.backend ~= "telescope"
+  then
     vim.notify(
       "sessman: unknown backend '"
         .. tostring(M.options.backend)
         .. "'.\n"
-        .. "  Valid values: 'fzf', 'telescope', or nil (auto-detect).",
+        .. "  Valid values: 'fzf', 'telescope', 'minipick', 'snacks' or nil (auto-detect).",
       vim.log.levels.WARN
     )
     M.options.backend = nil
@@ -78,20 +84,20 @@ function M.get()
 end
 
 --- Detect which picker backend is available
----@return "fzf"|"telescope"|nil
+---@return "fzf"|"telescope"|"minipick"|"snacks"|nil
 function M.detect_backend()
-  local cfg = M.get()
-
-  -- If explicitly configured, use that
-  if cfg.backend then
-    return cfg.backend
+  if M.options.backend then
+    return M.options.backend
   end
 
-  -- Try to detect
   if pcall(require, "fzf-lua") then
     return "fzf"
   elseif pcall(require, "telescope") then
     return "telescope"
+  elseif pcall(require, "mini.pick") then
+    return "minipick"
+  elseif pcall(require, "snacks") then
+    return "snacks"
   end
 
   return nil

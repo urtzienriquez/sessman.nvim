@@ -73,7 +73,7 @@ function M.pick_session(files, dir, cb)
           cb(file)
         end)
       end,
-      ["ctrl-d"] = {
+      ["ctrl-x"] = {
         fn = function(selected)
           if not selected or not selected[1] then
             return
