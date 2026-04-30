@@ -52,6 +52,8 @@ local function load_session(session_file)
     return false
   end
 
+  vim.api.nvim_exec_autocmds("SessionLoadPre", {})
+
   -- clean current state
   vim.cmd.tabonly({ mods = { silent = true } })
   vim.cmd("silent bufdo bwipeout")
