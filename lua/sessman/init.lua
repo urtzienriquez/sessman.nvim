@@ -144,9 +144,12 @@ function M.init()
     require("sessman.logger").setup()
   end
 
+  local session_group = vim.api.nvim_create_augroup("SessmanSession", { clear = true })
+
   -- Notify on SessionLoadPost about session loaded
   -- also auto-load associated shada file and notify
   vim.api.nvim_create_autocmd("SessionLoadPost", {
+    group = session_group,
     callback = function()
       local session_file = vim.v.this_session
       if session_file == "" then
@@ -176,6 +179,7 @@ function M.init()
   -- Write session-specific shada before switching sessions
   -- only writes if the current session has an associated shada file and it is curretnly being used
   vim.api.nvim_create_autocmd("SessionLoadPre", {
+    group = session_group,
     callback = function()
       local session_file = vim.v.this_session
       if session_file == "" then
