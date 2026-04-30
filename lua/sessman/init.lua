@@ -167,6 +167,8 @@ function M.init()
           { "ShaDa loaded: ", "DiagnosticHint" },
           { shada_file, "None" },
         }, false, {})
+      else
+        vim.o.shadafile = ""
       end
     end,
   })
