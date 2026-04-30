@@ -173,6 +173,24 @@ function M.init()
     end,
   })
 
+  -- Write session-specific shada before switching sessions
+  -- only writes if the current session has an associated shada file and it is curretnly being used
+  vim.api.nvim_create_autocmd("SessionLoadPre", {
+    callback = function()
+      local session_file = vim.v.this_session
+      if session_file == "" then
+        return
+      end
+      local shada_file = session_file:gsub("%.vim$", "") .. ".shada"
+      if
+        vim.fn.filereadable(shada_file) == 1
+        and vim.fn.fnamemodify(vim.o.shadafile, ":p") == vim.fn.fnamemodify(shada_file, ":p")
+      then
+        vim.cmd("wshada!")
+      end
+    end,
+  })
+
   -- set highlight groups
   require("sessman.highlights").setup()
 
