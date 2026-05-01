@@ -84,13 +84,13 @@ local function set_keymaps()
     end
   end
 
-  map(km.save, M.save, "sessman: save session")
-  map(km.load, M.load, "sessman: load session")
-  map(km.project_set, M.project_set, "sessman: set project directory")
-  map(km.project_pick, M.project_pick, "sessman: pick project directory")
-  map(km.project_clear, M.project_clear, "sessman: clear project")
-  map(km.current, M.current, "sessman: show current session")
-  map(km.tmux_sync, M.tmux_sync, "sessman: sync tmux-resurrect")
+  map(km.save, M.save, "save session")
+  map(km.load, M.load, "load session")
+  map(km.project_set, M.project_set, "set project directory")
+  map(km.project_pick, M.project_pick, "pick project directory")
+  map(km.project_clear, M.project_clear, "clear project")
+  map(km.current, M.current, "show current session")
+  map(km.tmux_sync, M.tmux_sync, "sync tmux-resurrect")
 end
 
 -- ─────────────────────────────────────────────────────────────
