@@ -154,7 +154,7 @@ COMMANDS                                                    *sessman-commands*
 
                                                              *:SessionInfo*
 :SessionInfo
-    Toggle the sessman info window (ConformInfo-style). See |sessman-info|.
+    Toggle the sessman info window. See |sessman-info|.
 
                                                            *:SessionTmuxSync*
 :SessionTmuxSync
@@ -172,12 +172,13 @@ COMMANDS                                                    *sessman-commands*
 ==============================================================================
 INFO WINDOW                                                      *sessman-info*
 
-The info window is a floating, ConformInfo-style status window that shows the
-current sessman state and a log of recent activity. Session, ShaDa and project
-status is reported here instead of transient echo/notify messages.
+The info window is a scratch buffer opened in a new tab (like |:checkhealth|)
+that shows the current sessman state and a log of recent activity. Session,
+ShaDa and project status is reported here instead of transient echo/notify
+messages.
 
 Open it with |:SessionInfo|, |:SessionCurrent|, or the `current` keymap
-(default `<leader>mc`).
+(default `<leader>mc`).  A second invocation focuses the existing tab.
 
 Typical content: >lua
 
@@ -188,23 +189,41 @@ Typical content: >lua
     Project:  /home/user/projects/myapp
 
     ────────────────────────────────────────
-    Loaded Session  /home/user/projects/myapp/Session.vim
-    Loaded ShaDa    /home/user/projects/myapp/Session.shada
+    ●  Loaded Session  /home/user/projects/myapp/Session.vim
+    ●  Loaded ShaDa    /home/user/projects/myapp/Session.shada
+    ○  Loaded Session  /home/user/projects/other/v1.vim
 
-The window always reflects live state: the session is `v:this_session`, the
-ShaDa is `'shadafile'`, and the project is |sessman-projects|. The activity
-log keeps the last ~15 session/shada/project operations so you can review what
-happened even after it occurred.
+The top section always reflects live state: the session is `v:this_session`,
+the ShaDa is `'shadafile'`, and the project is |sessman-projects|.
+
+The activity log keeps the last ~15 session/shada/project operations.  The
+most recently loaded session and ShaDa are marked with a full green circle
+(the `active_icon`, highlight `DiagnosticOk`); older loaded entries use an
+empty circle (the `past_icon`).  The entry text uses the same highlight in
+every case, so the marker alone distinguishes the current load.  Other events
+(saved, deleted, project changes) are shown without a prefix icon.
+
+                                                       *sessman-info-config*
+Options (in |sessman.setup|): >lua
+
+    info = {
+      active_icon = "●",          -- full green circle: current session/ShaDa
+      past_icon   = "○",          -- empty circle: past loaded entries
+      active_highlight = "DiagnosticOk",  -- green highlight for the active marker
+    }
+
+You can replace `active_icon` / `past_icon` with any unicode string, e.g.
+Nerd Font glyphs, without affecting functionality.
 
                                                            *sessman-info-maps*
 Mappings in the info window:
 
-q or <Esc>      Close the info window.
+q or <Esc>      Close the info tab (wipe the buffer).
 
 g?              Open this help documentation.
 
-The buffer is not listed, does not appear in the buffer list and is wiped when
-closed. It is opened on demand; it never pops up automatically.
+The buffer is not listed and is wiped when closed.  It is opened on demand;
+it never pops up automatically.
 
 ==============================================================================
 UI BUFFER                                                          *sessman-ui*

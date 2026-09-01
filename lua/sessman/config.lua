@@ -8,6 +8,12 @@ local M = {}
 ---@field session_dir? string  Custom session directory (defaults to stdpath("data")/session/)
 ---@field project_detection? "auto"|"manual"  How to detect projects
 ---@field keymaps SessmanKeymapConfig
+---@field info SessmanInfoConfig
+
+---@class SessmanInfoConfig
+---@field active_icon string  Marker shown on the currently loaded session/shada
+---@field past_icon string  Marker shown on past loaded session/shada entries
+---@field active_highlight string  Highlight group for the active marker
 
 ---@class SessmanKeymapConfig
 ---@field enabled boolean
@@ -24,6 +30,12 @@ M.defaults = {
   backend = nil, -- Auto-detect fzf-lua, telescope, minipick or snacks
   session_dir = nil, -- Will default to vim.fn.stdpath("data") .. "/session/"
   project_detection = "auto", -- Auto-set project on VimEnter to cwd
+
+  info = {
+    active_icon = "●",  -- Marker for the currently loaded session/shada
+    past_icon = "○",    -- Marker for past loaded entries
+    active_highlight = "DiagnosticOk", -- Highlight for the active marker (green)
+  },
 
   keymaps = {
     enabled = true,

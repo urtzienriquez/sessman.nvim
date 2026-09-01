@@ -1,13 +1,13 @@
 --- lua/sessman/info.lua
---- Status window for sessman.nvim (ConformInfo-style)
+--- Status window for sessman.nvim
 --- Shows the current session, ShaDa and project state plus a log of
 --- recent activity instead of transient echo/notify messages.
+--- Opens in a new tab (like :checkhealth) as a scratch buffer.
 
 local M = {}
 
 local state = {
   buf = nil,
-  win = nil,
   events = {}, -- { { kind, text, hl }, ... } newest first
 }
 
@@ -45,9 +45,40 @@ function M.add(kind, text, hl)
   if #state.events > MAX_EVENTS then
     table.remove(state.events)
   end
-  if state.win and vim.api.nvim_win_is_valid(state.win) then
+  if state.buf and vim.api.nvim_buf_is_valid(state.buf) then
     M.render()
   end
+end
+
+--- Build the segment list for one event line
+---@param ev table { kind, text, hl }
+---@param current_session string
+---@param current_shada string
+---@return table segments
+local function event_segments(ev, current_session, current_shada)
+  local is_loaded = ev.kind == "Loaded Session" or ev.kind == "Loaded ShaDa"
+
+  if not is_loaded then
+    local segs = { { ev.kind, "SessmanLabel" } }
+    if ev.text and ev.text ~= "" then
+      segs[#segs + 1] = { "  " .. ev.text, ev.hl }
+    end
+    return segs
+  end
+
+  local current_path = ev.kind == "Loaded Session" and current_session or current_shada
+  local active = current_path ~= "" and ev.text == current_path
+
+  local cfg = require("sessman.config").get().info
+  local icon = active and cfg.active_icon or cfg.past_icon
+  local icon_hl = active and cfg.active_highlight or "SessmanComment"
+
+  -- text is uniformly highlighted for every entry; only the marker differs
+  return {
+    { icon .. "  ", icon_hl },
+    { ev.kind .. "  ", "SessmanLabel" },
+    { ev.text, ev.hl },
+  }
 end
 
 --- Build the window content as a list of lines, each a list of
@@ -89,11 +120,7 @@ local function build_lines()
     lines[#lines + 1] = { { "No recent activity", "SessmanComment" } }
   else
     for _, ev in ipairs(state.events) do
-      local segs = { { ev.kind, "SessmanLabel" } }
-      if ev.text and ev.text ~= "" then
-        segs[#segs + 1] = { "  " .. ev.text, ev.hl }
-      end
-      lines[#lines + 1] = segs
+      lines[#lines + 1] = event_segments(ev, session, shada)
     end
   end
 
@@ -136,64 +163,11 @@ function M.render()
       col = col + #seg[1]
     end
   end
-
-  -- keep the window sized to the content
-  if state.win and vim.api.nvim_win_is_valid(state.win) then
-    local cfg = M.float_config(segments)
-    vim.api.nvim_win_set_config(state.win, cfg)
-  end
 end
 
---- Compute the floating window config
----@param segments? table[][] Pre-built lines to measure
-function M.float_config(segments)
-  segments = segments or build_lines()
-
-  local width = 60
-  for _, segs in ipairs(segments) do
-    local len = 0
-    for _, seg in ipairs(segs) do
-      len = len + #seg[1]
-    end
-    if len > width then
-      width = len
-    end
-  end
-
-  local content_width = math.min(width + 2, vim.o.columns - 4)
-  local content_height = math.min(#segments + 2, vim.o.lines - 4)
-
-  return {
-    relative = "editor",
-    row = math.max(0, math.floor((vim.o.lines - content_height) / 2) - 1),
-    col = math.max(0, math.floor((vim.o.columns - content_width) / 2)),
-    width = content_width,
-    height = content_height,
-    style = "minimal",
-    border = "rounded",
-  }
-end
-
---- Close the info window and wipe its buffer
-function M.close()
-  if state.win and vim.api.nvim_win_is_valid(state.win) then
-    vim.api.nvim_win_close(state.win, false)
-  end
-  if state.buf and vim.api.nvim_buf_is_valid(state.buf) then
-    vim.api.nvim_buf_delete(state.buf, { force = true })
-  end
-  state.win = nil
-  state.buf = nil
-end
-
---- Open the info window, focusing it if already open
-function M.open()
-  if state.win and vim.api.nvim_win_is_valid(state.win) then
-    vim.api.nvim_set_current_win(state.win)
-    M.render()
-    return state.win
-  end
-
+--- Create the scratch buffer for the info view
+---@return integer bufnr
+local function create_buffer()
   state.buf = vim.api.nvim_create_buf(false, true)
   vim.bo[state.buf].buftype = "nofile"
   vim.bo[state.buf].bufhidden = "wipe"
@@ -209,13 +183,38 @@ function M.open()
   vim.keymap.set("n", "<Esc>", M.close, opts)
   vim.keymap.set("n", "g?", "<Cmd>help sessman-info<CR>", opts)
 
-  state.win = vim.api.nvim_open_win(state.buf, true, M.float_config())
-  return state.win
+  return state.buf
 end
 
---- Toggle the info window open/closed
+--- Close the info window and wipe its buffer
+function M.close()
+  local buf = state.buf
+  state.buf = nil
+  if buf and vim.api.nvim_buf_is_valid(buf) then
+    vim.api.nvim_buf_delete(buf, { force = true })
+  end
+end
+
+--- Open the info view in a new tab, focusing it if already open
+function M.open()
+  if state.buf and vim.api.nvim_buf_is_valid(state.buf) then
+    local wins = vim.fn.win_findbuf(state.buf)
+    if #wins > 0 then
+      vim.api.nvim_set_current_win(wins[1])
+      M.render()
+      return vim.api.nvim_get_current_win()
+    end
+  end
+
+  local buf = create_buffer()
+  -- Open in a new tabpage, like :checkhealth
+  vim.cmd.sbuffer { buf, mods = { tab = vim.api.nvim_tabpage_get_number(0) } }
+  return vim.api.nvim_get_current_win()
+end
+
+--- Toggle the info view open/closed
 function M.toggle()
-  if state.win and vim.api.nvim_win_is_valid(state.win) then
+  if state.buf and vim.api.nvim_buf_is_valid(state.buf) and #vim.fn.win_findbuf(state.buf) > 0 then
     M.close()
   else
     M.open()

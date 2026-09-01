@@ -46,7 +46,7 @@ function M.current()
   require("sessman.session").current_session()
 end
 
---- Toggle the sessman info window (ConformInfo-style status)
+--- Toggle the sessman info window
 function M.info()
   require("sessman.info").toggle()
 end

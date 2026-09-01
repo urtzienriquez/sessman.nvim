@@ -24,6 +24,7 @@ sessman-configuration	sessman.txt	/*sessman-configuration*
 sessman-contents	sessman.txt	/*sessman-contents*
 sessman-features	sessman.txt	/*sessman-features*
 sessman-info	sessman.txt	/*sessman-info*
+sessman-info-config	sessman.txt	/*sessman-info-config*
 sessman-info-maps	sessman.txt	/*sessman-info-maps*
 sessman-installation	sessman.txt	/*sessman-installation*
 sessman-introduction	sessman.txt	/*sessman-introduction*

@@ -105,19 +105,32 @@ vim.keymap.set("n", "<leader>l", require("sessman").load)
 - `:SessionProjectPick` - Pick project directory via picker
 - `:SessionProjectClear` - Clear project setting
 - `:SessionCurrent` - Open the info window with current session/ShaDa status
-- `:SessionInfo` - Toggle the info window (ConformInfo-style status)
+- `:SessionInfo` - Toggle the info window
 - `:SessionTmuxSync` - Sync with tmux-resurrect
 - `:SessionDebugStart` / `:SessionDebugStop` - Toggle debug logging
 
 ### Status Info Window
 
-`SessionInfo` (or the `current` keymap `<leader>mc`) opens a floating,
-ConformInfo-style window showing the current session, ShaDa and project state,
-plus a log of recent activity (loaded/saved/deleted sessions, project changes).
+`SessionInfo` (or the `current` keymap `<leader>mc`) opens a scratch buffer
+in a new tab (like `:checkhealth`) showing the current session, ShaDa and
+project state, plus a log of recent activity (loaded/saved/deleted sessions,
+project changes).
 
 Instead of transient echo messages, sessman records session and ShaDa load
 events in this window — open it any time to see whether a session is loaded and
 which ShaDa file is in use. `q` or `<Esc>` closes it.
+
+The most recently loaded session/ShaDa are marked with a full green `●` (`DiagnosticOk`); older loaded entries use an empty `○`. All entry text uses the same highlight — only the marker identifies the current load. Icons are customizable via the `info` table in `setup()`:
+
+```lua
+require("sessman").setup({
+  info = {
+    active_icon = "●",
+    past_icon   = "○",
+    active_highlight = "DiagnosticOk",
+  },
+})
+```
 
 ### Interactive UI
 
