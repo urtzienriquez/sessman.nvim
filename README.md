@@ -104,9 +104,20 @@ vim.keymap.set("n", "<leader>l", require("sessman").load)
 - `:SessionProjectSet [path]` - Set project directory
 - `:SessionProjectPick` - Pick project directory via picker
 - `:SessionProjectClear` - Clear project setting
-- `:SessionCurrent` - Show current session file path
+- `:SessionCurrent` - Open the info window with current session/ShaDa status
+- `:SessionInfo` - Toggle the info window (ConformInfo-style status)
 - `:SessionTmuxSync` - Sync with tmux-resurrect
 - `:SessionDebugStart` / `:SessionDebugStop` - Toggle debug logging
+
+### Status Info Window
+
+`SessionInfo` (or the `current` keymap `<leader>mc`) opens a floating,
+ConformInfo-style window showing the current session, ShaDa and project state,
+plus a log of recent activity (loaded/saved/deleted sessions, project changes).
+
+Instead of transient echo messages, sessman records session and ShaDa load
+events in this window — open it any time to see whether a session is loaded and
+which ShaDa file is in use. `q` or `<Esc>` closes it.
 
 ### Interactive UI
 
@@ -131,7 +142,7 @@ The UI allows you to:
 | `<leader>ms` | SessionSave        | Save session             |
 | `<leader>ml` | SessionLoad        | Load session             |
 | `<leader>mp` | SessionProjectPick | Pick project             |
-| `<leader>mc` | SessionCurrent     | Show current session     |
+| `<leader>mc` | SessionCurrent     | Open info window         |
 | `<leader>mt` | SessionTmuxSync    | Sync with tmux-resurrect |
 
 ### API
@@ -143,7 +154,8 @@ sessman.save()            -- Save session
 sessman.load()            -- Load session
 sessman.project_pick()    -- Pick project
 sessman.project_set(path) -- Set project
-sessman.current()         -- Show current session
+sessman.current()         -- Open info window
+sessman.info()            -- Toggle info window
 sessman.tmux_sync()       -- Sync tmux-resurrect
 sessman.debug()           -- Show configuration
 ```

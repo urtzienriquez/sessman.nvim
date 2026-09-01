@@ -1,6 +1,7 @@
 :SessionCurrent	sessman.txt	/*:SessionCurrent*
 :SessionDebugStart	sessman.txt	/*:SessionDebugStart*
 :SessionDebugStop	sessman.txt	/*:SessionDebugStop*
+:SessionInfo	sessman.txt	/*:SessionInfo*
 :SessionLoad	sessman.txt	/*:SessionLoad*
 :SessionProjectClear	sessman.txt	/*:SessionProjectClear*
 :SessionProjectPick	sessman.txt	/*:SessionProjectPick*
@@ -22,6 +23,8 @@ sessman-config-session-dir	sessman.txt	/*sessman-config-session-dir*
 sessman-configuration	sessman.txt	/*sessman-configuration*
 sessman-contents	sessman.txt	/*sessman-contents*
 sessman-features	sessman.txt	/*sessman-features*
+sessman-info	sessman.txt	/*sessman-info*
+sessman-info-maps	sessman.txt	/*sessman-info-maps*
 sessman-installation	sessman.txt	/*sessman-installation*
 sessman-introduction	sessman.txt	/*sessman-introduction*
 sessman-license	sessman.txt	/*sessman-license*
@@ -46,6 +49,7 @@ sessman.current()	sessman.txt	/*sessman.current()*
 sessman.debug()	sessman.txt	/*sessman.debug()*
 sessman.debug_start()	sessman.txt	/*sessman.debug_start()*
 sessman.debug_stop()	sessman.txt	/*sessman.debug_stop()*
+sessman.info()	sessman.txt	/*sessman.info()*
 sessman.load()	sessman.txt	/*sessman.load()*
 sessman.project_clear()	sessman.txt	/*sessman.project_clear()*
 sessman.project_pick()	sessman.txt	/*sessman.project_pick()*

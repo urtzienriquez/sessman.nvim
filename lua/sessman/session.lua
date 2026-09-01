@@ -6,23 +6,7 @@ local M = {}
 --- Get the current session file path
 -- ---@return string
 function M.current_session()
-  local msg = {}
-
-  if vim.v.this_session == "" then
-    table.insert(msg, { "No active session\n", "DiagnosticWarn" })
-  else
-    table.insert(msg, { "Session: ", "DiagnosticHint" })
-    table.insert(msg, { vim.v.this_session .. "\n", "None" })
-  end
-
-  if vim.o.shadafile == "" then
-    table.insert(msg, { "Global ShaDa file", "DiagnosticWarn" })
-  else
-    table.insert(msg, { "ShaDa: ", "DiagnosticHint" })
-    table.insert(msg, { vim.o.shadafile, "None" })
-  end
-
-  vim.api.nvim_echo(msg, false, {})
+  require("sessman.info").toggle()
 end
 
 --- Save a session with the given name
@@ -93,15 +77,10 @@ local function do_save(name, opts)
   vim.fn.chdir(old_cwd)
   vim.o.sessionoptions = old_sessionoptions
 
-  vim.api.nvim_echo({
-    { "Saved Session: ", "DiagnosticHint" },
-    { session_file, "None" },
-  }, false, {})
+  local info = require("sessman.info")
+  info.add("Saved Session", session_file, "DiagnosticHint")
   if opts.shada then
-    vim.api.nvim_echo({
-      { "Saved ShaDa: ", "DiagnosticHint" },
-      { shada_file, "None" },
-    }, false, {})
+    info.add("Saved ShaDa", shada_file, "DiagnosticHint")
   end
 end
 
@@ -161,15 +140,9 @@ function M.delete(file, dir, on_complete)
 
       local success, err = os.remove(path)
       if success then
-        vim.api.nvim_echo({
-          { "Deleted Session: ", "DiagnosticWarn" },
-          { file, "None" },
-        }, false, {})
+        require("sessman.info").add("Deleted Session", file, "DiagnosticWarn")
       else
-        vim.api.nvim_echo({
-          { "Failed to delete session: ", "DiagnosticError" },
-          { err or "unknown error", "None" },
-        }, false, {})
+        vim.notify("Failed to delete session: " .. (err or "unknown error"), vim.log.levels.ERROR)
       end
 
       local base = file:gsub("%.vim$", "")
@@ -181,10 +154,9 @@ function M.delete(file, dir, on_complete)
 
         local shada_success, shada_err = os.remove(shada_path)
         if shada_success then
-          vim.api.nvim_echo({
-            { "Deleted ShaDa: ", "DiagnosticWarn" },
-            { base .. ".shada", "None" },
-          }, false, {})
+          require("sessman.info").add("Deleted ShaDa", base .. ".shada", "DiagnosticWarn")
+        else
+          vim.notify("Failed to delete ShaDa: " .. (shada_err or "unknown error"), vim.log.levels.WARN)
         end
       end
 
@@ -192,9 +164,7 @@ function M.delete(file, dir, on_complete)
       local remaining_files = vim.fn.readdir(dir)
       if #remaining_files == 0 then
         vim.fn.delete(dir, "d")
-        vim.api.nvim_echo({
-          { "Removed empty session directory", "DiagnosticInfo" },
-        }, false, {})
+        require("sessman.info").add("Removed empty directory", dir, "DiagnosticInfo")
       end
     end
 

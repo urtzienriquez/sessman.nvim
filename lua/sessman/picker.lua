@@ -87,9 +87,7 @@ function M.pick_session()
       return
     end
 
-    vim.api.nvim_echo({
-      { "No sessions for this project: " .. dir, "DiagnosticWarn" },
-    }, false, {})
+    vim.notify("No sessions for this project: " .. dir, vim.log.levels.WARN)
     return
   end
 
@@ -105,9 +103,7 @@ function M.pick_session()
       return
     end
 
-    vim.api.nvim_echo({
-      { "No sessions found in: " .. dir, "DiagnosticWarn" },
-    }, false, {})
+    vim.notify("No sessions found in: " .. dir, vim.log.levels.WARN)
     return
   end
 

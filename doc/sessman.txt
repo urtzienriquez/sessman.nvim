@@ -8,13 +8,14 @@ CONTENTS                                                    *sessman-contents*
     3. Installation ............................ |sessman-installation|
     4. Configuration ........................... |sessman-configuration|
     5. Commands ................................ |sessman-commands|
-    6. UI Buffer ............................... |sessman-ui|
-    7. Session Management ...................... |sessman-sessions|
-    8. Project Management ...................... |sessman-projects|
-    9. Backend Support ......................... |sessman-backends|
-   10. tmux Integration ........................ |sessman-tmux|
-   11. API ..................................... |sessman-api|
-   12. License ................................. |sessman-license|
+    6. Info Window ............................. |sessman-info|
+    7. UI Buffer ............................... |sessman-ui|
+    8. Session Management ...................... |sessman-sessions|
+    9. Project Management ...................... |sessman-projects|
+   10. Backend Support ......................... |sessman-backends|
+   11. tmux Integration ........................ |sessman-tmux|
+   12. API ..................................... |sessman-api|
+   13. License ................................. |sessman-license|
 
 ==============================================================================
 INTRODUCTION                                            *sessman-introduction*
@@ -146,11 +147,16 @@ COMMANDS                                                    *sessman-commands*
 :SessionProjectClear
     Clear the current project setting. Falls back to cwd for operations.
 
-                                                           *:SessionCurrent*
+*:SessionCurrent*
 :SessionCurrent
-    Display the current session file path and ShaDa file status.
+    Open the sessman info window showing the current session and ShaDa file
+    status. See |sessman-info|.
 
-                                                          *:SessionTmuxSync*
+                                                             *:SessionInfo*
+:SessionInfo
+    Toggle the sessman info window (ConformInfo-style). See |sessman-info|.
+
+                                                           *:SessionTmuxSync*
 :SessionTmuxSync
     Sync the current Neovim session with tmux-resurrect. See |sessman-tmux|
     for details on tmux integration.
@@ -162,6 +168,43 @@ COMMANDS                                                    *sessman-commands*
                                                         *:SessionDebugStop*
 :SessionDebugStop
     Disable debug logging.
+
+==============================================================================
+INFO WINDOW                                                      *sessman-info*
+
+The info window is a floating, ConformInfo-style status window that shows the
+current sessman state and a log of recent activity. Session, ShaDa and project
+status is reported here instead of transient echo/notify messages.
+
+Open it with |:SessionInfo|, |:SessionCurrent|, or the `current` keymap
+(default `<leader>mc`).
+
+Typical content: >lua
+
+    Sessman
+
+    Session:  /home/user/projects/myapp/Session.vim
+    ShaDa:    /home/user/projects/myapp/Session.shada
+    Project:  /home/user/projects/myapp
+
+    ────────────────────────────────────────
+    Loaded Session  /home/user/projects/myapp/Session.vim
+    Loaded ShaDa    /home/user/projects/myapp/Session.shada
+
+The window always reflects live state: the session is `v:this_session`, the
+ShaDa is `'shadafile'`, and the project is |sessman-projects|. The activity
+log keeps the last ~15 session/shada/project operations so you can review what
+happened even after it occurred.
+
+                                                           *sessman-info-maps*
+Mappings in the info window:
+
+q or <Esc>      Close the info window.
+
+g?              Open this help documentation.
+
+The buffer is not listed, does not appear in the buffer list and is wiped when
+closed. It is opened on demand; it never pops up automatically.
 
 ==============================================================================
 UI BUFFER                                                          *sessman-ui*
@@ -255,6 +298,7 @@ When loading:
 • Session file is sourced
 • ShaDa file is automatically loaded if it exists
 • Working directory is restored to the saved location
+• Load status is recorded in the info window |sessman-info|
 
                                                     *sessman-session-delete*
 Deleting Sessions ~
@@ -444,8 +488,13 @@ sessman.project_clear()
 
                                                          *sessman.current()*
 sessman.current()
-    Display current session and ShaDa file paths.
+    Open the info window showing the current session and ShaDa status.
     Equivalent to |:SessionCurrent|.
+
+                                                            *sessman.info()*
+sessman.info()
+    Toggle the info window |sessman-info|.
+    Equivalent to |:SessionInfo|.
 
                                                       *sessman.tmux_sync()*
 sessman.tmux_sync()

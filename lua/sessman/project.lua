@@ -11,24 +11,17 @@ function M.set(path)
   path = vim.fn.fnamemodify(path, ":p")
 
   if vim.fn.isdirectory(path) == 0 then
-    vim.api.nvim_echo({
-      { "Invalid directory: " .. path, "DiagnosticWarn" },
-    }, false, {})
+    vim.notify("Invalid directory: " .. path, vim.log.levels.WARN)
     return
   end
 
   vim.g.sessman_project = path
-  vim.api.nvim_echo({
-    { "Sessman project set to: ", "DiagnosticHint" },
-    {path, "None"},
-  }, false, {})
+  require("sessman.info").add("Project set", path, "DiagnosticHint")
 end
 
 function M.clear()
   vim.g.sessman_project = nil
-  vim.api.nvim_echo({
-    { "Sessman project cleared", "DiagnosticHint" },
-  }, false, {})
+  require("sessman.info").add("Project cleared", vim.fn.getcwd(), "DiagnosticHint")
 end
 
 return M

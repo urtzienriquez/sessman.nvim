@@ -46,6 +46,11 @@ function M.current()
   require("sessman.session").current_session()
 end
 
+--- Toggle the sessman info window (ConformInfo-style status)
+function M.info()
+  require("sessman.info").toggle()
+end
+
 --- Sync session with tmux-resurrect
 function M.tmux_sync()
   local tmux = require("sessman.tmux")
@@ -106,6 +111,7 @@ local function create_commands()
   vim.api.nvim_create_user_command("SessionProjectPick", M.project_pick, {})
   vim.api.nvim_create_user_command("SessionProjectClear", M.project_clear, {})
   vim.api.nvim_create_user_command("SessionCurrent", M.current, {})
+  vim.api.nvim_create_user_command("SessionInfo", M.info, {})
   vim.api.nvim_create_user_command("SessionTmuxSync", M.tmux_sync, {})
   vim.api.nvim_create_user_command("SessionDebugStart", M.debug_start, {})
   vim.api.nvim_create_user_command("SessionDebugStop", M.debug_stop, {})
@@ -156,20 +162,14 @@ function M.init()
         return
       end
 
-      vim.api.nvim_echo({
-        { "Session loaded: ", "DiagnosticHint" },
-        { session_file, "None" },
-      }, false, {})
+      require("sessman.info").add("Loaded Session", session_file, "DiagnosticHint")
 
       local shada_file = session_file:gsub("%.vim$", "") .. ".shada"
       if vim.fn.filereadable(shada_file) == 1 then
         vim.o.shadafile = shada_file
         vim.cmd("rshada! " .. vim.fn.fnameescape(shada_file))
 
-        vim.api.nvim_echo({
-          { "ShaDa loaded: ", "DiagnosticHint" },
-          { shada_file, "None" },
-        }, false, {})
+        require("sessman.info").add("Loaded ShaDa", shada_file, "DiagnosticHint")
       else
         vim.o.shadafile = ""
       end

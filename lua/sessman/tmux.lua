@@ -145,13 +145,9 @@ function M.update_tmux_resurrect_session()
 
   if updated then
     vim.fn.writefile(lines, saved_file)
-    vim.api.nvim_echo({
-      { "Synced nvim - tmux resurrect for current pane", "DiagnosticInfo" },
-    }, false, {})
+    require("sessman.info").add("Synced nvim - tmux resurrect for current pane", "", "DiagnosticInfo")
   else
-    vim.api.nvim_echo({
-      { "No matching pane found in resurrect file", "DiagnosticWarn" },
-    }, false, {})
+    vim.notify("No matching pane found in resurrect file", vim.log.levels.WARN)
   end
 end
 
