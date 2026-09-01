@@ -162,14 +162,20 @@ function M.init()
         return
       end
 
-      require("sessman.info").add("Loaded Session", session_file, "DiagnosticHint")
+      -- Session files fire this once per window; only handle the first fire
+      local info = require("sessman.info")
+      if not info.is_new_load("Post", session_file) then
+        return
+      end
+
+      info.add("Loaded Session", session_file, "DiagnosticHint")
 
       local shada_file = session_file:gsub("%.vim$", "") .. ".shada"
       if vim.fn.filereadable(shada_file) == 1 then
         vim.o.shadafile = shada_file
         vim.cmd("rshada! " .. vim.fn.fnameescape(shada_file))
 
-        require("sessman.info").add("Loaded ShaDa", shada_file, "DiagnosticHint")
+        info.add("Loaded ShaDa", shada_file, "DiagnosticHint")
       else
         vim.o.shadafile = ""
       end
@@ -185,6 +191,12 @@ function M.init()
       if session_file == "" then
         return
       end
+
+      -- Session files fire this once per window; only handle the first fire
+      if not require("sessman.info").is_new_load("Pre", session_file) then
+        return
+      end
+
       local shada_file = session_file:gsub("%.vim$", "") .. ".shada"
       if
         vim.fn.filereadable(shada_file) == 1

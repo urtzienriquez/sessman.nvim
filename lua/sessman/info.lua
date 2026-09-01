@@ -14,6 +14,28 @@ local state = {
 local ns_id = vim.api.nvim_create_namespace("sessman_info")
 local MAX_EVENTS = 15
 
+--- Dedupe guard for SessionLoadPre/Post autocmds.
+--- Session files fire these events once per window (via :doautoall), so this
+--- returns true only for the first fire of a load and for genuinely new loads.
+--- Each event type keeps its own entry so the first SessionLoadPre and the
+--- first SessionLoadPost of the same load are both honored.
+local load_guard = {}
+
+---@param event "Pre"|"Post"
+---@param path string this_session path
+---@return boolean true if this is not a repeated synchronous fire of the same load
+local LOAD_BURST_NS = 500e6 -- 500ms, covers the whole burst from one :source
+
+function M.is_new_load(event, path)
+  local entry = load_guard[event]
+  local now = vim.uv.hrtime()
+  if entry and entry.path == path and (now - entry.mono) < LOAD_BURST_NS then
+    return false
+  end
+  load_guard[event] = { path = path, mono = now }
+  return true
+end
+
 --- Push an event into the activity log and refresh the window if open
 ---@param kind string Prefix shown for the event
 ---@param text string Event description
