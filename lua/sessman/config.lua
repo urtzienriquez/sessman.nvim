@@ -19,6 +19,7 @@ local M = {}
 ---@field enabled boolean
 ---@field save string|false
 ---@field load string|false
+---@field delete string|false
 ---@field project_set string|false
 ---@field project_pick string|false
 ---@field project_clear string|false
@@ -41,6 +42,7 @@ M.defaults = {
     enabled = true,
     save = "<leader>ms", -- SessionSave
     load = "<leader>ml", -- SessionLoad
+    delete = "<leader>md", -- SessionDelete
     project_set = false, -- SessionProjectSet (no default keymap)
     project_pick = "<leader>mp", -- SessionProjectPick
     project_clear = false, -- SessionProjectClear (no default keymap)

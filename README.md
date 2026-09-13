@@ -44,6 +44,7 @@ require("sessman").setup({
         enabled = true,
         save = "<leader>ms",
         load = "<leader>ml",
+        delete = "<leader>md",
         project_pick = "<leader>mp",
         current = "<leader>mc",
         tmux_sync = "<leader>mt",  -- optional: sync with tmux-resurrect
@@ -74,6 +75,7 @@ require("sessman").setup({
     enabled = true,
     save = "<leader>ms",           -- SessionSave
     load = "<leader>ml",           -- SessionLoad
+    delete = "<leader>md",         -- SessionDelete
     project_set = false,           -- SessionProjectSet (no default)
     project_pick = "<leader>mp",   -- SessionProjectPick
     project_clear = false,         -- SessionProjectClear (no default)
@@ -101,6 +103,7 @@ vim.keymap.set("n", "<leader>l", require("sessman").load)
 
 - `:SessionSave` - Save current session (opens interactive UI)
 - `:SessionLoad` - Load a session via picker
+- `:SessionDelete [name]` - Delete a session (vim.ui.select, or directly by name)
 - `:SessionProjectSet [path]` - Set project directory
 - `:SessionProjectPick` - Pick project directory via picker
 - `:SessionProjectClear` - Clear project setting
@@ -154,6 +157,7 @@ The UI allows you to:
 | ------------ | ------------------ | ------------------------ |
 | `<leader>ms` | SessionSave        | Save session             |
 | `<leader>ml` | SessionLoad        | Load session             |
+| `<leader>md` | SessionDelete      | Delete session           |
 | `<leader>mp` | SessionProjectPick | Pick project             |
 | `<leader>mc` | SessionCurrent     | Open info window         |
 | `<leader>mt` | SessionTmuxSync    | Sync with tmux-resurrect |
@@ -165,6 +169,7 @@ local sessman = require("sessman")
 
 sessman.save()            -- Save session
 sessman.load()            -- Load session
+sessman.delete()          -- Delete session (or sessman.delete(name))
 sessman.project_pick()    -- Pick project
 sessman.project_set(path) -- Set project
 sessman.current()         -- Open info window
