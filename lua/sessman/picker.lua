@@ -17,6 +17,38 @@ function M.pick_project()
   end)
 end
 
+--- Gather available sessions for the current project
+---@return string dir Session directory (may not exist yet)
+---@return string[]|nil files Session filenames (nil if none found)
+---@return string local_session Project-local Session.vim path
+local function get_sessions()
+  local current_project = project.get()
+  local encoded = util.encode_path(current_project)
+
+  local cfg = require("sessman.config").get()
+  local base = cfg.session_dir
+  local dir = base .. encoded
+  local local_session = current_project .. "/Session.vim"
+
+  -- check if session directory exists
+  if vim.fn.isdirectory(dir) == 0 then
+    return dir, nil, local_session
+  end
+
+  local files = vim.tbl_filter(function(file)
+    return file:match("%.vim$")
+  end, vim.fn.readdir(dir))
+
+  if #files == 0 then
+    return dir, nil, local_session
+  end
+
+  -- Sort by modification time
+  util.sort_by_mtime(dir, files)
+
+  return dir, files, local_session
+end
+
 --- get list of unsaved (relevant) buffers
 local function get_unsaved_buffers()
   local unsaved = {}
@@ -72,16 +104,9 @@ end
 
 --- pick and load a session
 function M.pick_session()
-  local current_project = project.get()
-  local encoded = util.encode_path(current_project)
+  local dir, files, local_session = get_sessions()
 
-  local cfg = require("sessman.config").get()
-  local base = cfg.session_dir
-  local dir = base .. encoded
-  local local_session = current_project .. "/Session.vim"
-
-  -- check if session directory exists
-  if vim.fn.isdirectory(dir) == 0 then
+  if not files then
     if vim.fn.filereadable(local_session) == 1 then
       load_session(local_session)
       return
@@ -91,25 +116,6 @@ function M.pick_session()
     return
   end
 
-  -- Read session files
-  local files = vim.fn.readdir(dir)
-  files = vim.tbl_filter(function(file)
-    return file:match("%.vim$")
-  end, files)
-
-  if not files or #files == 0 then
-    if vim.fn.filereadable(local_session) == 1 then
-      load_session(local_session)
-      return
-    end
-
-    vim.notify("No sessions found in: " .. dir, vim.log.levels.WARN)
-    return
-  end
-
-  -- Sort by modification time
-  util.sort_by_mtime(dir, files)
-
   -- Use backend to pick session
   backends.call("pick_session", files, dir, function(file)
     if not file then
@@ -118,6 +124,40 @@ function M.pick_session()
 
     local session_file = dir .. "/" .. file
     load_session(session_file)
+  end)
+end
+
+--- Pick a session to delete
+---@param name? string Session name to delete without prompting
+function M.pick_delete(name)
+  local session_mod = require("sessman.session")
+  local dir, files, local_session = get_sessions()
+
+  if name and name ~= "" then
+    if vim.fn.filereadable(dir .. "/" .. name) == 1 then
+      session_mod.delete(name, dir)
+    elseif vim.fn.filereadable(local_session) == 1 then
+      session_mod.delete("Session.vim", vim.fn.fnamemodify(local_session, ":h"))
+    else
+      vim.notify("Session '" .. name .. "' not found: " .. dir .. "/" .. name, vim.log.levels.WARN)
+    end
+    return
+  end
+
+  if not files then
+    if vim.fn.filereadable(local_session) == 1 then
+      session_mod.delete("Session.vim", vim.fn.fnamemodify(local_session, ":h"))
+      return
+    end
+
+    vim.notify("No sessions for this project: " .. dir, vim.log.levels.WARN)
+    return
+  end
+
+  vim.ui.select(files, { prompt = "Delete session" }, function(choice)
+    if choice then
+      session_mod.delete(choice, dir)
+    end
   end)
 end
 

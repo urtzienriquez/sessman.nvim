@@ -17,6 +17,12 @@ function M.load()
   require("sessman.picker").pick_session()
 end
 
+--- Delete a session
+---@param name? string Optional session name to delete without prompting
+function M.delete(name)
+  require("sessman.picker").pick_delete(name)
+end
+
 --- Set the project directory
 ---@param path? string
 function M.project_set(path)
@@ -91,6 +97,7 @@ local function set_keymaps()
 
   map(km.save, M.save, "save session")
   map(km.load, M.load, "load session")
+  map(km.delete, M.delete, "delete session")
   map(km.project_set, M.project_set, "set project directory")
   map(km.project_pick, M.project_pick, "pick project directory")
   map(km.project_clear, M.project_clear, "clear project")
@@ -105,6 +112,9 @@ end
 local function create_commands()
   vim.api.nvim_create_user_command("SessionSave", M.save, {})
   vim.api.nvim_create_user_command("SessionLoad", M.load, {})
+  vim.api.nvim_create_user_command("SessionDelete", function(opts)
+    M.delete(opts.args ~= "" and opts.args or nil)
+  end, { nargs = "?" })
   vim.api.nvim_create_user_command("SessionProjectSet", function(opts)
     M.project_set(opts.args ~= "" and opts.args or nil)
   end, { nargs = "?", complete = "dir" })
