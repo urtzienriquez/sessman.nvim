@@ -8,7 +8,7 @@ function M.setup()
   hl(ns, "SessmanLabel", { link = "Keyword" })
   hl(ns, "SessmanValue", { link = "Normal" })
   hl(ns, "SessmanComment", { link = "Comment" })
-  hl(ns, "SessmanSeparator", { link = "LineNr" })
+  hl(ns, "SessmanSeparator", { link = "LineNrNC" })
   hl(ns, "SessmanBoolean", { link = "Boolean" })
 end
 
