@@ -161,9 +161,9 @@ describe("list (session list buffer)", function()
     assert.is_not_nil(env.find_buf("sessman://session"))
   end)
 
-  it("ii toggles the info view", function()
+  it("ci toggles the info view", function()
     list.open()
-    env.feed("ii")
+    env.feed("ci")
     assert.is_not_nil(env.find_buf("sessman://info"))
   end)
 
