@@ -7,6 +7,7 @@
 :SessionProjectPick	sessman.txt	/*:SessionProjectPick*
 :SessionProjectSet	sessman.txt	/*:SessionProjectSet*
 :SessionSave	sessman.txt	/*:SessionSave*
+:SessionSaveCurrent	sessman.txt	/*:SessionSaveCurrent*
 :SessionTmuxSync	sessman.txt	/*:SessionTmuxSync*
 sessman-api	sessman.txt	/*sessman-api*
 sessman-backend-autodetect	sessman.txt	/*sessman-backend-autodetect*
@@ -58,6 +59,7 @@ sessman.project_clear()	sessman.txt	/*sessman.project_clear()*
 sessman.project_pick()	sessman.txt	/*sessman.project_pick()*
 sessman.project_set()	sessman.txt	/*sessman.project_set()*
 sessman.save()	sessman.txt	/*sessman.save()*
+sessman.save_current()	sessman.txt	/*sessman.save_current()*
 sessman.setup()	sessman.txt	/*sessman.setup()*
 sessman.tmux_sync()	sessman.txt	/*sessman.tmux_sync()*
 sessman.txt	sessman.txt	/*sessman.txt*

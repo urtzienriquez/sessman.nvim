@@ -126,6 +126,13 @@ COMMANDS                                                    *sessman-commands*
     Open the interactive UI buffer to configure and save a session. Save
     with |:wq|, or discard with |:q|. See |sessman-ui| for details.
 
+                                                       *:SessionSaveCurrent*
+:SessionSaveCurrent
+    Save the currently loaded session in place, asking to confirm the
+    overwrite. Its ShaDa file is also saved if it is the one in use. Opens
+    the |sessman-ui| buffer instead when no session is loaded, or when the
+    loaded session does not belong to the current project.
+
                                                               *:SessionLoad*
 :SessionLoad
     Open the |sessman-list| buffer: a persistent session list for the
@@ -348,7 +355,8 @@ Saving Sessions ~
 
 Sessions can be saved via:
 1. |:SessionSave| - Opens the interactive UI (save with |:wq|)
-2. `require("sessman").save()` - Programmatic save
+2. |:SessionSaveCurrent| - Overwrites the loaded session (asks to confirm)
+3. `require("sessman").save()` - Programmatic save
 
 When saving:
 • The session file contains window layouts, buffer lists, and settings
@@ -537,6 +545,14 @@ sessman.setup({opts})
 sessman.save()
     Open the interactive UI to save a session.
     Equivalent to |:SessionSave|.
+
+                                                    *sessman.save_current()*
+sessman.save_current()
+    Save the currently loaded session in place, asking to confirm the
+    overwrite. Meant to be mapped in your config, e.g. >lua
+        vim.keymap.set("n", "<leader>mw", require("sessman").save_current)
+<
+    Equivalent to |:SessionSaveCurrent|.
 
                                                             *sessman.load()*
 sessman.load()

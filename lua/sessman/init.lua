@@ -7,6 +7,11 @@ function M.save()
   require("sessman.ui").open()
 end
 
+--- Save the currently loaded session in place, prompting to overwrite.
+function M.save_current()
+  require("sessman.session").save_current()
+end
+
 --- Opens the persistent session-list buffer for the current project.
 --- The fuzzy-picker flow is still available via
 --- require("sessman.picker").pick_session() for anyone who wants it.
@@ -75,6 +80,7 @@ end
 
 local function create_commands()
   vim.api.nvim_create_user_command("SessionSave", M.save, {})
+  vim.api.nvim_create_user_command("SessionSaveCurrent", M.save_current, {})
   vim.api.nvim_create_user_command("SessionLoad", M.load, {})
   vim.api.nvim_create_user_command("SessionDelete", function(opts)
     M.delete(opts.args ~= "" and opts.args or nil)

@@ -129,6 +129,30 @@ function M.save(name, opts)
   do_save(name, opts)
 end
 
+--- Save the currently loaded session in place (prompting to overwrite).
+--- Falls back to the save UI when there is no session, or when it lives
+--- outside the current project's session directory.
+function M.save_current()
+  local util = require("sessman.util")
+  local project_mod = require("sessman.project")
+  local cfg = require("sessman.config").get()
+
+  local current = vim.v.this_session
+  local dir = cfg.session_dir .. util.encode_path(project_mod.get())
+
+  if current == "" or vim.fn.fnamemodify(current, ":p:h") ~= vim.fn.fnamemodify(dir, ":p:h") then
+    require("sessman.ui").open()
+    return
+  end
+
+  -- Keep the session's ShaDa in sync if it is the one in use
+  local shada_file = current:gsub("%.vim$", "") .. ".shada"
+  local shada = vim.o.shadafile ~= ""
+    and vim.fn.fnamemodify(vim.o.shadafile, ":p") == vim.fn.fnamemodify(shada_file, ":p")
+
+  M.save(vim.fn.fnamemodify(current, ":t"), { shada = shada })
+end
+
 ---@param file string Session filename
 ---@param dir string Directory containing the session
 ---@param on_complete? function Callback called after interaction (success or cancel)
