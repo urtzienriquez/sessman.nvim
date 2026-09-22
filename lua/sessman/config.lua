@@ -34,14 +34,23 @@ M.defaults = {
 M.options = nil
 local _initialized = false
 
+--- Session paths are built as `session_dir .. encoded_project`, so the
+--- directory must be expanded and end with exactly one slash.
+---@param dir? string
+---@return string
+local function normalize_session_dir(dir)
+  if not dir or dir == "" then
+    dir = vim.fn.stdpath("data") .. "/session"
+  end
+  return (vim.fn.expand(dir):gsub("/+$", "")) .. "/"
+end
+
 ---@param opts? table
 function M.set(opts)
   M.options = vim.tbl_deep_extend("force", M.defaults, opts or {})
   _initialized = true
 
-  if not M.options.session_dir then
-    M.options.session_dir = vim.fn.stdpath("data") .. "/session/"
-  end
+  M.options.session_dir = normalize_session_dir(M.options.session_dir)
 
   if
     M.options.backend
@@ -66,9 +75,7 @@ function M.get()
   if not _initialized then
     M.options = vim.deepcopy(M.defaults)
     _initialized = true
-    if not M.options.session_dir then
-      M.options.session_dir = vim.fn.stdpath("data") .. "/session/"
-    end
+    M.options.session_dir = normalize_session_dir(M.options.session_dir)
   end
   return M.options
 end
@@ -76,8 +83,9 @@ end
 --- Detect which picker backend is available
 ---@return "fzf"|"telescope"|"minipick"|"snacks"|nil
 function M.detect_backend()
-  if M.options.backend then
-    return M.options.backend
+  local backend = M.get().backend
+  if backend then
+    return backend
   end
 
   if pcall(require, "fzf-lua") then
