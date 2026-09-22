@@ -7,7 +7,6 @@ local M = {}
 ---@field backend? "fzf"|"telescope"|"minipick"|"snacks"  Picker backend (optional, auto-detected if not set)
 ---@field session_dir? string  Custom session directory (defaults to stdpath("data")/session/)
 ---@field project_detection? "auto"|"manual"  How to detect projects
----@field keymaps SessmanKeymapConfig
 ---@field info SessmanInfoConfig
 
 ---@class SessmanInfoConfig
@@ -15,16 +14,8 @@ local M = {}
 ---@field past_icon string  Marker shown on past loaded session/shada entries
 ---@field active_highlight string  Highlight group for the active marker
 
----@class SessmanKeymapConfig
----@field enabled boolean
----@field save string|false
----@field load string|false
----@field delete string|false
----@field project_set string|false
----@field project_pick string|false
----@field project_clear string|false
----@field current string|false
----@field tmux_sync string|false
+-- No keymaps.* config: sessman sets no keymaps of its own (like
+-- vim-fugitive) -- bind whatever you want to the commands it provides.
 
 ---@type SessmanConfig
 M.defaults = {
@@ -36,18 +27,6 @@ M.defaults = {
     active_icon = "●",  -- Marker for the currently loaded session/shada
     past_icon = "○",    -- Marker for past loaded entries
     active_highlight = "DiagnosticOk", -- Highlight for the active marker (green)
-  },
-
-  keymaps = {
-    enabled = true,
-    save = "<leader>ms", -- SessionSave
-    load = "<leader>ml", -- SessionLoad
-    delete = "<leader>md", -- SessionDelete
-    project_set = false, -- SessionProjectSet (no default keymap)
-    project_pick = "<leader>mp", -- SessionProjectPick
-    project_clear = false, -- SessionProjectClear (no default keymap)
-    current = "<leader>mc", -- SessionCurrent
-    tmux_sync = "<leader>mt", -- SessionTmuxSync (no default keymap)
   },
 }
 

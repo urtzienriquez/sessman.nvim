@@ -92,9 +92,6 @@ local function build_lines()
 
   local lines = {}
 
-  lines[#lines + 1] = { { "Sessman", "SessmanTitle" } }
-  lines[#lines + 1] = {}
-
   if session == "" then
     lines[#lines + 1] = { { "Session:  ", "SessmanLabel" }, { "(none)", "DiagnosticWarn" } }
   else
@@ -112,6 +109,7 @@ local function build_lines()
   end
 
   lines[#lines + 1] = { { "Project:  ", "SessmanLabel" }, { project, "SessmanValue" } }
+  lines[#lines + 1] = { { "Help:     ", "SessmanLabel" }, { "g?", "SessmanValue" } }
 
   lines[#lines + 1] = {}
   lines[#lines + 1] = { { string.rep("─", 40), "SessmanSeparator" } }
@@ -178,10 +176,12 @@ local function create_buffer()
 
   M.render()
 
-  local opts = { buffer = state.buf, silent = true, nowait = true }
-  vim.keymap.set("n", "q", M.close, opts)
-  vim.keymap.set("n", "<Esc>", M.close, opts)
-  vim.keymap.set("n", "g?", "<Cmd>help sessman-info<CR>", opts)
+  local function map(lhs, rhs, desc)
+    vim.keymap.set("n", lhs, rhs, { buffer = state.buf, silent = true, nowait = true, desc = desc })
+  end
+  map("q", M.close, "close")
+  map("<Esc>", M.close, "close")
+  map("g?", "<Cmd>help sessman-info-maps<CR>", "open help at the maps section")
 
   return state.buf
 end

@@ -29,6 +29,8 @@ sessman-info-maps	sessman.txt	/*sessman-info-maps*
 sessman-installation	sessman.txt	/*sessman-installation*
 sessman-introduction	sessman.txt	/*sessman-introduction*
 sessman-license	sessman.txt	/*sessman-license*
+sessman-list	sessman.txt	/*sessman-list*
+sessman-list-maps	sessman.txt	/*sessman-list-maps*
 sessman-project-auto	sessman.txt	/*sessman-project-auto*
 sessman-project-current	sessman.txt	/*sessman-project-current*
 sessman-project-encoded	sessman.txt	/*sessman-project-encoded*

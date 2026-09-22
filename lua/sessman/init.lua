@@ -12,9 +12,11 @@ function M.save()
   require("sessman.ui").open()
 end
 
---- Load a session via picker
+--- Load a session: opens the persistent session-list buffer (fugitive-style)
+--- for the current project. The fuzzy-picker flow is still available via
+--- require("sessman.picker").pick_session() for anyone who wants it.
 function M.load()
-  require("sessman.picker").pick_session()
+  require("sessman.list").open()
 end
 
 --- Delete a session
@@ -80,33 +82,14 @@ function M.debug_stop()
 end
 
 -- ─────────────────────────────────────────────────────────────
--- Keymaps
--- ─────────────────────────────────────────────────────────────
-
-local function set_keymaps()
-  local km = require("sessman.config").get().keymaps
-  if not km.enabled then
-    return
-  end
-
-  local function map(lhs, rhs, desc)
-    if lhs then
-      vim.keymap.set("n", lhs, rhs, { silent = true, desc = desc })
-    end
-  end
-
-  map(km.save, M.save, "save session")
-  map(km.load, M.load, "load session")
-  map(km.delete, M.delete, "delete session")
-  map(km.project_set, M.project_set, "set project directory")
-  map(km.project_pick, M.project_pick, "pick project directory")
-  map(km.project_clear, M.project_clear, "clear project")
-  map(km.current, M.current, "show current session")
-  map(km.tmux_sync, M.tmux_sync, "sync tmux-resurrect")
-end
-
--- ─────────────────────────────────────────────────────────────
 -- Commands
+--
+-- sessman sets no keymaps of its own (like vim-fugitive): everything is a
+-- command/Lua function, and it's up to your own config to bind whatever
+-- you want, e.g. `vim.keymap.set("n", "<leader>ms", "<Cmd>SessionLoad<CR>")`.
+-- The session-list buffer opened by :SessionLoad has its own buffer-local
+-- keymaps for the rest of sessman's actions (see lua/sessman/list.lua).
+-- ─────────────────────────────────────────────────────────────
 -- ─────────────────────────────────────────────────────────────
 
 local function create_commands()
@@ -151,9 +134,6 @@ function M.init()
 
   -- Create user commands
   create_commands()
-
-  -- Set up keymaps
-  set_keymaps()
 
   -- Initialize logger if debug mode was previously enabled
   if vim.g.sessman_debug then

@@ -39,18 +39,15 @@ local function apply_highlights(buf, data)
     })
   end
 
-  hi_line(0, "SessmanTitle")
-  hi_text(2, "Name:", "SessmanLabel")
-  hi_text(2, data.name, "SessmanValue")
-  hi_text(3, "Write shada?", "SessmanLabel")
-  hi_text(3, data.write_shada and "yes" or "no", "SessmanBoolean")
-  hi_line(5, "SessmanSeparator")
-  hi_text(6, "Project:", "SessmanLabel")
-  hi_text(6, data.project, "SessmanValue")
-
-  for i = 8, #lines - 1 do
-    hi_line(i, "SessmanComment")
-  end
+  hi_text(0, "Name:", "SessmanLabel")
+  hi_text(0, data.name, "SessmanValue")
+  hi_text(1, "Write shada?", "SessmanLabel")
+  hi_text(1, data.write_shada and "yes" or "no", "SessmanBoolean")
+  hi_line(3, "SessmanSeparator")
+  hi_text(4, "Project:", "SessmanLabel")
+  hi_text(4, data.project, "SessmanValue")
+  hi_text(6, "Help:", "SessmanLabel")
+  hi_text(6, "g?", "SessmanValue")
 end
 
 local function render()
@@ -63,19 +60,13 @@ local function render()
   vim.bo[state.buf].readonly = false
 
   local lines = {
-    "Session",
-    "",
     string.format("Name:        %s", state.data.name),
     string.format("Write shada? %s", state.data.write_shada and "yes" or "no"),
     "",
     "────────────────────────────────────────",
     string.format("Project: %s", state.data.project),
     "",
-    "# Commands:",
-    "# <CR>  Toggle/Edit option",
-    "# s     Save session",
-    "# q     Close",
-    "# g?    Help (press q to return)",
+    "Help:     g?",
   }
 
   vim.api.nvim_buf_set_lines(state.buf, 0, -1, false, lines)
@@ -138,25 +129,27 @@ function M.open()
 
   render()
 
-  local opts = { buffer = state.buf, silent = true, nowait = true }
+  local function map(lhs, rhs, desc)
+    vim.keymap.set("n", lhs, rhs, { buffer = state.buf, silent = true, nowait = true, desc = desc })
+  end
 
-  vim.keymap.set("n", "<CR>", toggle_option, opts)
+  map("<CR>", toggle_option, "toggle/edit option under cursor")
 
-  vim.keymap.set("n", "s", function()
+  map("s", function()
     vim.cmd("close")
     session.save(state.data.name, { shada = state.data.write_shada })
-  end, opts)
+  end, "save session")
 
-  vim.keymap.set("n", "q", "<Cmd>close<CR>", opts)
-  vim.keymap.set("n", "g?", "<Cmd>help sessman-ui-maps<CR>", opts)
-  vim.keymap.set("n", "]c", function()
+  map("q", "<Cmd>close<CR>", "close")
+  map("g?", "<Cmd>help sessman-ui-maps<CR>", "open help at the maps section")
+  map("]c", function()
     vim.fn.search([[\v^\w+:]], "W")
-  end, opts)
-  vim.keymap.set("n", "[c", function()
+  end, "next field")
+  map("[c", function()
     vim.fn.search([[\v^\w+:]], "bW")
-  end, opts)
+  end, "previous field")
 
-  vim.api.nvim_win_set_cursor(0, { 3, 13 })
+  vim.api.nvim_win_set_cursor(0, { 1, 13 })
 end
 
 return M

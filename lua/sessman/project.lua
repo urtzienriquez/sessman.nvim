@@ -17,11 +17,13 @@ function M.set(path)
 
   vim.g.sessman_project = path
   require("sessman.info").add("Project set", path, "DiagnosticHint")
+  vim.api.nvim_exec_autocmds("User", { pattern = "SessmanProjectChanged" })
 end
 
 function M.clear()
   vim.g.sessman_project = nil
   require("sessman.info").add("Project cleared", vim.fn.getcwd(), "DiagnosticHint")
+  vim.api.nvim_exec_autocmds("User", { pattern = "SessmanProjectChanged" })
 end
 
 return M

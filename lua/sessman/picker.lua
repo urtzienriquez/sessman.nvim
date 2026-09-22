@@ -21,7 +21,7 @@ end
 ---@return string dir Session directory (may not exist yet)
 ---@return string[]|nil files Session filenames (nil if none found)
 ---@return string local_session Project-local Session.vim path
-local function get_sessions()
+function M.get_sessions()
   local current_project = project.get()
   local encoded = util.encode_path(current_project)
 
@@ -71,7 +71,7 @@ local function get_unsaved_buffers()
 end
 
 --- load a session safely
-local function load_session(session_file)
+function M.load_session(session_file)
   -- abort if unsaved changes exist
   local unsaved = get_unsaved_buffers()
 
@@ -104,11 +104,11 @@ end
 
 --- pick and load a session
 function M.pick_session()
-  local dir, files, local_session = get_sessions()
+  local dir, files, local_session = M.get_sessions()
 
   if not files then
     if vim.fn.filereadable(local_session) == 1 then
-      load_session(local_session)
+      M.load_session(local_session)
       return
     end
 
@@ -123,7 +123,7 @@ function M.pick_session()
     end
 
     local session_file = dir .. "/" .. file
-    load_session(session_file)
+    M.load_session(session_file)
   end)
 end
 
@@ -131,7 +131,7 @@ end
 ---@param name? string Session name to delete without prompting
 function M.pick_delete(name)
   local session_mod = require("sessman.session")
-  local dir, files, local_session = get_sessions()
+  local dir, files, local_session = M.get_sessions()
 
   if name and name ~= "" then
     if vim.fn.filereadable(dir .. "/" .. name) == 1 then
