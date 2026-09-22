@@ -173,8 +173,7 @@ local function create_buffer()
   local function map(lhs, rhs, desc)
     vim.keymap.set("n", lhs, rhs, { buffer = state.buf, silent = true, nowait = true, desc = desc })
   end
-  map("q", M.close, "close")
-  map("<Esc>", M.close, "close")
+  map("mq", M.close, "close")
   map("g?", "<Cmd>help sessman-info-maps<CR>", "open help at the maps section")
 
   return state.buf

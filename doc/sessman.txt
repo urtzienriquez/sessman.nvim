@@ -224,7 +224,7 @@ Nerd Font glyphs, without affecting functionality.
                                                            *sessman-info-maps*
 Mappings in the info window:
 
-q or <Esc>      Close the info tab (wipe the buffer).
+mq              Close the info tab (wipe the buffer).
 
 g?              Open this help documentation at the maps section.
 
@@ -271,9 +271,9 @@ pp              Pick a project directory via the configured picker
 
 cx              Clear the project directory (falls back to cwd).
 
-ii              Toggle |sessman-info|.
+ci              Toggle |sessman-info|.
 
-TT              Sync with tmux-resurrect (|:SessionTmuxSync|).
+T               Sync with tmux-resurrect (|:SessionTmuxSync|).
 
 R               Refresh the list.
 
