@@ -7,6 +7,23 @@ function M.current_session()
   require("sessman.info").toggle()
 end
 
+--- Close sessman's own windows so mksession doesn't record them: their
+--- nofile buffers can't be restored and would come back as empty windows.
+---@return boolean had_list true if the session list was open
+local function close_sessman_windows()
+  local had_list = false
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    local name = vim.api.nvim_buf_get_name(vim.api.nvim_win_get_buf(win))
+    if name:match("^sessman://") then
+      if name == "sessman://sessions" then
+        had_list = true
+      end
+      pcall(vim.api.nvim_win_close, win, true)
+    end
+  end
+  return had_list
+end
+
 ---@param name? string Optional session name (defaults to "Session.vim")
 ---@param opts? table Optional settings { shada = boolean }
 local function do_save(name, opts)
@@ -35,6 +52,8 @@ local function do_save(name, opts)
   local old_cwd = vim.fn.getcwd()
   local old_sessionoptions = vim.o.sessionoptions
   local current_dir = old_cwd
+
+  local reopen_list = close_sessman_windows()
 
   vim.fn.chdir(project)
 
@@ -68,6 +87,10 @@ local function do_save(name, opts)
   info.add("Saved Session", session_file, "DiagnosticHint")
   if opts.shada then
     info.add("Saved ShaDa", shada_file, "DiagnosticHint")
+  end
+
+  if reopen_list then
+    require("sessman.list").open()
   end
 end
 
