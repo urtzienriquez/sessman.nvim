@@ -108,9 +108,9 @@ project_detection ~
 
                                                     *sessman-config-keymaps*
 Keymaps ~
-    Sessman sets no keymaps of its own, like vim-fugitive: everything is a
-    command or Lua function (see |sessman-commands| and |sessman-api|), and
-    it's up to your own config to bind whatever you want, e.g.: >lua
+    Sessman sets no keymaps of its own: everything is a command or Lua
+    function (see |sessman-commands| and |sessman-api|), and it's up to
+    your own config to bind whatever you want, e.g.: >lua
 
     vim.keymap.set("n", "<leader>ms", "<Cmd>SessionLoad<CR>")
 <
@@ -128,9 +128,9 @@ COMMANDS                                                    *sessman-commands*
 
                                                               *:SessionLoad*
 :SessionLoad
-    Open the |sessman-list| buffer: a persistent, fugitive-style session
-    list for the current project, with buffer-local keymaps for
-    load/delete/save/project management. The fuzzy-picker flow is still
+    Open the |sessman-list| buffer: a persistent session list for the
+    current project, with buffer-local keymaps for load/delete/save/
+    project management. The fuzzy-picker flow is still
     available programmatically via
     `require("sessman.picker").pick_session()` for anyone who wants it.
 
@@ -228,10 +228,10 @@ it never pops up automatically.
 ==============================================================================
 SESSION LIST BUFFER                                              *sessman-list*
 
-|:SessionLoad| opens a persistent, fugitive-style buffer listing the
-sessions for the current project, instead of a fuzzy-picker popup. It is
-the one thing meant to be bound in your own config -- everything else is a
-buffer-local keymap inside it.
+|:SessionLoad| opens a persistent buffer listing the sessions for the
+current project, instead of a fuzzy-picker popup. It is the one thing
+meant to be bound in your own config -- everything else is a buffer-local
+keymap inside it.
 
 Typical content: >lua
 
@@ -250,9 +250,8 @@ The active/past markers use the same `active_icon`/`past_icon`/
 `active_highlight` config as |sessman-info-config|.
 
                                                          *sessman-list-maps*
-Mappings in the session list buffer, doubled-letter for actions
-(fugitive-style: cc=commit, dd=diff, ...), except R which fugitive itself
-also keeps bare:
+Mappings in the session list buffer. Actions are doubled-letter (e.g.
+dd/ss), except R which stays bare:
 
 <CR>            Load the session under the cursor.
 
@@ -262,8 +261,7 @@ ss              Open |sessman-ui| to save a new session.
 
 cp<Space>       Change the project directory. Pre-fills the command line
                 with `:SessionProjectSet ` and the cwd as an editable
-                default (fugitive's "co<Space>" technique) -- edit and
-                press <CR>, or <Esc> to cancel.
+                default -- edit and press <CR>, or <Esc> to cancel.
 
 pp              Pick a project directory via the configured picker
                 backend.
@@ -280,8 +278,7 @@ mq              Close the buffer.
 
 g?              Open this help documentation at the maps section.
 
-Navigation (the g-prefix is reserved for section jumps, never actions,
-same as fugitive's own gu/gU/gs/gp/gP/gr):
+Navigation (the g-prefix is reserved for section jumps, never actions):
 
 gs              Go to the "Sessions" heading.
 

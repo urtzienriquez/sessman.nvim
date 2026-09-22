@@ -13,9 +13,6 @@ local action_state = require("telescope.actions.state")
 
 local util = require("sessman.util")
 
--- ------------------------
--- Directory Picker
--- ------------------------
 function M.pick_directory(cb)
   local home = vim.fn.expand("~")
   local show_hidden = false
@@ -76,9 +73,6 @@ function M.pick_directory(cb)
   start()
 end
 
--- ------------------------
--- Session Picker
--- ------------------------
 function M.pick_session(files, dir, cb)
   pickers
     .new({}, {

@@ -7,7 +7,6 @@ local project = require("sessman.project")
 local util = require("sessman.util")
 local backends = require("sessman.backends")
 
---- Pick a project directory
 function M.pick_project()
   backends.call("pick_directory", function(dir)
     if not dir then
@@ -17,7 +16,6 @@ function M.pick_project()
   end)
 end
 
---- Gather available sessions for the current project
 ---@return string dir Session directory (may not exist yet)
 ---@return string[]|nil files Session filenames (nil if none found)
 ---@return string local_session Project-local Session.vim path
@@ -30,7 +28,6 @@ function M.get_sessions()
   local dir = base .. encoded
   local local_session = current_project .. "/Session.vim"
 
-  -- check if session directory exists
   if vim.fn.isdirectory(dir) == 0 then
     return dir, nil, local_session
   end
@@ -43,13 +40,11 @@ function M.get_sessions()
     return dir, nil, local_session
   end
 
-  -- Sort by modification time
   util.sort_by_mtime(dir, files)
 
   return dir, files, local_session
 end
 
---- get list of unsaved (relevant) buffers
 local function get_unsaved_buffers()
   local unsaved = {}
 
@@ -70,9 +65,8 @@ local function get_unsaved_buffers()
   return unsaved
 end
 
---- load a session safely
+--- Aborts if unsaved changes exist.
 function M.load_session(session_file)
-  -- abort if unsaved changes exist
   local unsaved = get_unsaved_buffers()
 
   if #unsaved > 0 then
@@ -86,11 +80,9 @@ function M.load_session(session_file)
 
   vim.api.nvim_exec_autocmds("SessionLoadPre", {})
 
-  -- clean current state
   vim.cmd.tabonly({ mods = { silent = true } })
   vim.cmd("silent bufdo bwipeout")
 
-  -- load session
   local ok, err = pcall(vim.cmd, "silent source " .. vim.fn.fnameescape(session_file))
 
   if not ok then
@@ -102,7 +94,6 @@ function M.load_session(session_file)
   return true
 end
 
---- pick and load a session
 function M.pick_session()
   local dir, files, local_session = M.get_sessions()
 
@@ -116,7 +107,6 @@ function M.pick_session()
     return
   end
 
-  -- Use backend to pick session
   backends.call("pick_session", files, dir, function(file)
     if not file then
       return
@@ -127,7 +117,6 @@ function M.pick_session()
   end)
 end
 
---- Pick a session to delete
 ---@param name? string Session name to delete without prompting
 function M.pick_delete(name)
   local session_mod = require("sessman.session")

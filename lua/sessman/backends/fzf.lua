@@ -6,7 +6,6 @@ local M = {}
 local fzf = require("fzf-lua")
 local actions = require("fzf-lua.actions")
 
---- Pick a directory for project selection
 ---@param cb function Callback receiving the selected directory path
 function M.pick_directory(cb)
   local home = vim.fn.expand("~")
@@ -55,7 +54,6 @@ function M.pick_directory(cb)
   })
 end
 
---- Pick a session file
 ---@param files string[] List of session filenames
 ---@param dir string Directory containing the sessions
 ---@param cb function Callback receiving the selected filename
@@ -82,9 +80,8 @@ function M.pick_session(files, dir, cb)
           local session_mod = require("sessman.session")
 
           session_mod.delete(file, dir, function()
-            -- check if directory still exists
             if vim.fn.isdirectory(dir) == 0 then
-              -- if last session removed, close the picker by sending esc key
+              -- Last session removed: close the picker by sending Esc.
               vim.schedule(function()
                 vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "n", false)
               end)

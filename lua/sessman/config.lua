@@ -14,19 +14,19 @@ local M = {}
 ---@field past_icon string  Marker shown on past loaded session/shada entries
 ---@field active_highlight string  Highlight group for the active marker
 
--- No keymaps.* config: sessman sets no keymaps of its own (like
--- vim-fugitive) -- bind whatever you want to the commands it provides.
+-- No keymaps.* config: sessman sets no keymaps of its own -- bind
+-- whatever you want to the commands it provides.
 
 ---@type SessmanConfig
 M.defaults = {
-  backend = nil, -- Auto-detect fzf-lua, telescope, minipick or snacks
-  session_dir = nil, -- Will default to vim.fn.stdpath("data") .. "/session/"
-  project_detection = "auto", -- Auto-set project on VimEnter to cwd
+  backend = nil, -- auto-detect fzf-lua, telescope, minipick or snacks
+  session_dir = nil, -- defaults to vim.fn.stdpath("data") .. "/session/"
+  project_detection = "auto",
 
   info = {
-    active_icon = "●",  -- Marker for the currently loaded session/shada
-    past_icon = "○",    -- Marker for past loaded entries
-    active_highlight = "DiagnosticOk", -- Highlight for the active marker (green)
+    active_icon = "●",
+    past_icon = "○",
+    active_highlight = "DiagnosticOk",
   },
 }
 
@@ -39,12 +39,10 @@ function M.set(opts)
   M.options = vim.tbl_deep_extend("force", M.defaults, opts or {})
   _initialized = true
 
-  -- Set default session_dir if not provided
   if not M.options.session_dir then
     M.options.session_dir = vim.fn.stdpath("data") .. "/session/"
   end
 
-  -- Validate backend if provided
   if
     M.options.backend
     and M.options.backend ~= "fzf"
@@ -68,7 +66,6 @@ function M.get()
   if not _initialized then
     M.options = vim.deepcopy(M.defaults)
     _initialized = true
-    -- Set default session_dir
     if not M.options.session_dir then
       M.options.session_dir = vim.fn.stdpath("data") .. "/session/"
     end

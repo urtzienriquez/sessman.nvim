@@ -3,29 +3,22 @@
 
 local M = {}
 
--- ─────────────────────────────────────────────────────────────
--- Public API functions
--- ─────────────────────────────────────────────────────────────
-
---- Save the current session
 function M.save()
   require("sessman.ui").open()
 end
 
---- Load a session: opens the persistent session-list buffer (fugitive-style)
---- for the current project. The fuzzy-picker flow is still available via
+--- Opens the persistent session-list buffer for the current project.
+--- The fuzzy-picker flow is still available via
 --- require("sessman.picker").pick_session() for anyone who wants it.
 function M.load()
   require("sessman.list").open()
 end
 
---- Delete a session
 ---@param name? string Optional session name to delete without prompting
 function M.delete(name)
   require("sessman.picker").pick_delete(name)
 end
 
---- Set the project directory
 ---@param path? string
 function M.project_set(path)
   if path then
@@ -39,27 +32,22 @@ function M.project_set(path)
   end
 end
 
---- Pick a project directory using the picker
 function M.project_pick()
   require("sessman.picker").pick_project()
 end
 
---- Clear the current project setting
 function M.project_clear()
   require("sessman.project").clear()
 end
 
---- Show the current session file path
 function M.current()
   require("sessman.session").current_session()
 end
 
---- Toggle the sessman info window
 function M.info()
   require("sessman.info").toggle()
 end
 
---- Sync session with tmux-resurrect
 function M.tmux_sync()
   local tmux = require("sessman.tmux")
   if not tmux.is_inside_tmux() then
@@ -69,28 +57,21 @@ function M.tmux_sync()
   tmux.update_tmux_resurrect_session()
 end
 
---- Enable debug logging
 function M.debug_start()
   vim.g.sessman_debug = true
   print("Sessman debug logging enabled: " .. vim.fn.stdpath("state") .. "/sessman-debug.log")
 end
 
---- Disable debug logging
 function M.debug_stop()
   vim.g.sessman_debug = false
   print("Sessman debug logging disabled")
 end
 
--- ─────────────────────────────────────────────────────────────
--- Commands
---
--- sessman sets no keymaps of its own (like vim-fugitive): everything is a
--- command/Lua function, and it's up to your own config to bind whatever
--- you want, e.g. `vim.keymap.set("n", "<leader>ms", "<Cmd>SessionLoad<CR>")`.
+-- sessman sets no keymaps of its own: everything is a command/Lua
+-- function, and it's up to your own config to bind whatever you want,
+-- e.g. `vim.keymap.set("n", "<leader>ms", "<Cmd>SessionLoad<CR>")`.
 -- The session-list buffer opened by :SessionLoad has its own buffer-local
 -- keymaps for the rest of sessman's actions (see lua/sessman/list.lua).
--- ─────────────────────────────────────────────────────────────
--- ─────────────────────────────────────────────────────────────
 
 local function create_commands()
   vim.api.nvim_create_user_command("SessionSave", M.save, {})
@@ -110,13 +91,9 @@ local function create_commands()
   vim.api.nvim_create_user_command("SessionDebugStop", M.debug_stop, {})
 end
 
--- ─────────────────────────────────────────────────────────────
--- Initialization
--- ─────────────────────────────────────────────────────────────
-
 local _initialized = false
 
---- Initialize sessman (called by plugin/sessman.lua on VimEnter)
+--- Called by plugin/sessman.lua on VimEnter.
 function M.init()
   if _initialized then
     return
@@ -125,25 +102,20 @@ function M.init()
 
   local cfg = require("sessman.config").get()
 
-  -- Set initial project if auto-detection is enabled
   if cfg.project_detection == "auto" then
     if not vim.g.sessman_project or vim.g.sessman_project == "" then
       vim.g.sessman_project = vim.fn.getcwd()
     end
   end
 
-  -- Create user commands
   create_commands()
 
-  -- Initialize logger if debug mode was previously enabled
   if vim.g.sessman_debug then
     require("sessman.logger").setup()
   end
 
   local session_group = vim.api.nvim_create_augroup("SessmanSession", { clear = true })
 
-  -- Notify on SessionLoadPost about session loaded
-  -- also auto-load associated shada file and notify
   vim.api.nvim_create_autocmd("SessionLoadPost", {
     group = session_group,
     callback = function()
@@ -172,8 +144,8 @@ function M.init()
     end,
   })
 
-  -- Write session-specific shada before switching sessions
-  -- only writes if the current session has an associated shada file and it is curretnly being used
+  -- Only writes if the current session has an associated shada file that is
+  -- also the one currently in use.
   vim.api.nvim_create_autocmd("SessionLoadPre", {
     group = session_group,
     callback = function()
@@ -197,7 +169,6 @@ function M.init()
     end,
   })
 
-  -- set highlight groups
   require("sessman.highlights").setup()
 
   vim.api.nvim_create_autocmd("ColorScheme", {
@@ -207,7 +178,6 @@ function M.init()
   })
 end
 
---- Setup function for user configuration
 ---@param opts? table
 function M.setup(opts)
   require("sessman.config").set(opts)
@@ -217,7 +187,6 @@ function M.setup(opts)
   end
 end
 
---- Debug helper to show current configuration
 function M.debug()
   local cfg = require("sessman.config").get()
   print("sessman configuration:")

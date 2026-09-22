@@ -7,9 +7,6 @@ end
 
 local util = require("sessman.util")
 
--- ------------------------
--- Directory Picker
--- ------------------------
 function M.pick_directory(cb)
   local show_hidden = false
 
@@ -45,9 +42,6 @@ function M.pick_directory(cb)
   start()
 end
 
--- ------------------------
--- Session Picker
--- ------------------------
 function M.pick_session(files, dir, cb)
   pick.start({
     source = {
@@ -73,8 +67,7 @@ function M.pick_session(files, dir, cb)
             return
           end
 
-          -- Close picker to allow vim.ui.select focus
-          pick.stop()
+          pick.stop() -- lets vim.ui.select take focus
 
           vim.schedule(function()
             local session_mod = require("sessman.session")
@@ -84,12 +77,10 @@ function M.pick_session(files, dir, cb)
                 return
               end
 
-              -- Refresh the file list
               local updated = vim.tbl_filter(function(f)
                 return f:match("%.vim$")
               end, vim.fn.readdir(dir))
 
-              -- Restart picker if there are sessions left
               if #updated > 0 then
                 M.pick_session(updated, dir, cb)
               else

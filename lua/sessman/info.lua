@@ -20,12 +20,11 @@ local MAX_EVENTS = 15
 --- Each event type keeps its own entry so the first SessionLoadPre and the
 --- first SessionLoadPost of the same load are both honored.
 local load_guard = {}
+local LOAD_BURST_NS = 500e6 -- 500ms, covers the whole burst from one :source
 
 ---@param event "Pre"|"Post"
 ---@param path string this_session path
 ---@return boolean true if this is not a repeated synchronous fire of the same load
-local LOAD_BURST_NS = 500e6 -- 500ms, covers the whole burst from one :source
-
 function M.is_new_load(event, path)
   local entry = load_guard[event]
   local now = vim.uv.hrtime()
@@ -36,7 +35,6 @@ function M.is_new_load(event, path)
   return true
 end
 
---- Push an event into the activity log and refresh the window if open
 ---@param kind string Prefix shown for the event
 ---@param text string Event description
 ---@param hl? string Highlight group for the event line
@@ -50,7 +48,6 @@ function M.add(kind, text, hl)
   end
 end
 
---- Build the segment list for one event line
 ---@param ev table { kind, text, hl }
 ---@param current_session string
 ---@param current_shada string
@@ -73,7 +70,6 @@ local function event_segments(ev, current_session, current_shada)
   local icon = active and cfg.active_icon or cfg.past_icon
   local icon_hl = active and cfg.active_highlight or "SessmanComment"
 
-  -- text is uniformly highlighted for every entry; only the marker differs
   return {
     { icon .. "  ", icon_hl },
     { ev.kind .. "  ", "SessmanLabel" },
@@ -125,7 +121,6 @@ local function build_lines()
   return lines
 end
 
---- Render the current state into the info buffer
 function M.render()
   if not state.buf or not vim.api.nvim_buf_is_valid(state.buf) then
     return
@@ -163,7 +158,6 @@ function M.render()
   end
 end
 
---- Create the scratch buffer for the info view
 ---@return integer bufnr
 local function create_buffer()
   state.buf = vim.api.nvim_create_buf(false, true)
@@ -186,7 +180,6 @@ local function create_buffer()
   return state.buf
 end
 
---- Close the info window and wipe its buffer
 function M.close()
   local buf = state.buf
   state.buf = nil
@@ -195,7 +188,7 @@ function M.close()
   end
 end
 
---- Open the info view in a new tab, focusing it if already open
+--- Open the info view in a new tab, focusing it if already open.
 function M.open()
   if state.buf and vim.api.nvim_buf_is_valid(state.buf) then
     local wins = vim.fn.win_findbuf(state.buf)
@@ -207,12 +200,10 @@ function M.open()
   end
 
   local buf = create_buffer()
-  -- Open in a new tabpage, like :checkhealth
   vim.cmd.sbuffer { buf, mods = { tab = vim.api.nvim_tabpage_get_number(0) } }
   return vim.api.nvim_get_current_win()
 end
 
---- Toggle the info view open/closed
 function M.toggle()
   if state.buf and vim.api.nvim_buf_is_valid(state.buf) and #vim.fn.win_findbuf(state.buf) > 0 then
     M.close()

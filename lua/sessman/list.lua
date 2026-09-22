@@ -1,12 +1,8 @@
 --- lua/sessman/list.lua
---- Fugitive-style persistent session buffer for the current project: single
---- scratch buffer, doubled-letter actions (load/delete/save/project
---- management, e.g. dd/ss like fugitive's cc/dd) instead of fuzzy pickers
---- or global keymaps. Like fugitive's status buffer, this is the ONE thing
---- meant to be bound in user config (e.g. `:SessionLoad`) -- everything
---- else lives as a keymap in here. Rebuilt in place on every action,
---- mirroring the scaffold already used by sessman/ui.lua and
---- sessman/info.lua.
+--- Persistent session-list buffer for the current project: doubled-letter
+--- actions instead of fuzzy pickers or global keymaps. This is the one
+--- thing meant to be bound in user config (e.g. `:SessionLoad`) --
+--- everything else is a keymap in here. Rebuilt in place on every action.
 
 local M = {}
 
@@ -25,8 +21,7 @@ local state = {
 local ns_id = vim.api.nvim_create_namespace("sessman_list")
 
 --- Build the segment list for the buffer, and the line->file lookup used by
---- the keymaps below. Segments follow sessman/info.lua's convention: each
---- line is a list of { text, hl_group } pairs.
+--- the keymaps below.
 ---@return table[][] segments
 ---@return table<integer,string> line_to_file
 local function build()
@@ -43,14 +38,11 @@ local function build()
     end
   end
 
-  -- No title, header lines back-to-back (no blank gaps), sections omitted
-  -- entirely when empty -- mirrors fugitive's actual status buffer exactly
-  -- (s:AddHeader/s:AddSection in autoload/fugitive.vim: header lines have
-  -- no spacing between them; a section adds a blank line + heading only
-  -- when it has entries, otherwise it contributes nothing at all).
   push({ { "Project:  ", "SessmanLabel" }, { state.project, "SessmanValue" } })
   push({ { "Help:     ", "SessmanLabel" }, { "g?", "SessmanValue" } })
 
+  -- Omitted entirely (no heading, no placeholder text) when there are no
+  -- sessions for this project.
   if state.files then
     push({})
     push({ { string.format("Sessions (%d)", #state.files), "SessmanHeading" } })
@@ -66,7 +58,6 @@ local function build()
   return segments, line_to_file
 end
 
---- Re-gather session data and redraw the buffer in place.
 local function render()
   if not state.buf or not vim.api.nvim_buf_is_valid(state.buf) then
     return
@@ -108,9 +99,6 @@ local function render()
   end
 end
 
---- Resolve the session filename under the cursor, re-derived fresh from
---- the current render every time (no state that can go stale between
---- renders), mirroring fugitive's "always re-inspect the buffer" approach.
 ---@return string|nil
 local function file_under_cursor()
   local lnum = vim.api.nvim_win_get_cursor(0)[1]
@@ -139,16 +127,13 @@ local function delete_under_cursor()
   require("sessman.session").delete(file, state.dir, render)
 end
 
---- Jump to the "Sessions (N)" heading, fugitive-style section jump
---- (mirrors fugitive's gu/gU/gs/gp/gP/gr, e.g. `s:MapMotion('gs', ...
---- StageJump(v:count, 'Staged'))`).
 local function goto_sessions()
   vim.fn.search([[\v^Sessions \(]], "W")
 end
 
---- Jump to the next/previous session entry line. Uses the exact line
---- numbers already recorded in state.line_to_file rather than a text
---- search, since we know precisely which lines are entries.
+--- Jumps using the line numbers already recorded in state.line_to_file
+--- rather than a text search, since we know precisely which lines are
+--- entries.
 ---@param delta 1|-1
 local function jump_entry(delta)
   local candidates = {}
@@ -180,9 +165,6 @@ local function jump_entry(delta)
   end
 end
 
---- Pick a project directory via the configured picker backend. Refresh
---- happens via the SessmanProjectChanged listener registered in M.open(),
---- same as the "cp<Space>"/"cx" command-driven paths below.
 local function pick_project()
   require("sessman.backends").call("pick_directory", function(dir)
     if dir then
@@ -221,9 +203,8 @@ function M.open()
 
   render()
 
-  -- Refresh whenever the project changes, regardless of which of the three
-  -- paths below caused it (typed command, picker, or clear) -- single
-  -- source of truth instead of each path re-rendering itself.
+  -- Refresh whenever the project changes, regardless of which path caused
+  -- it (typed command, picker, or clear).
   vim.api.nvim_create_autocmd("User", {
     pattern = "SessmanProjectChanged",
     group = vim.api.nvim_create_augroup("SessmanList", { clear = true }),
@@ -235,19 +216,12 @@ function M.open()
   end
 
   map("<CR>", load_under_cursor, "load session under cursor")
-  -- Doubled-letter actions, fugitive-style (cc=commit, dd=diff, etc.):
-  -- every action below is two keys, except R which fugitive itself also
-  -- keeps bare.
   map("dd", delete_under_cursor, "delete session under cursor")
   map("ss", function()
     require("sessman.ui").open()
   end, "save a new session")
-  -- Fugitive-style: the key sequence itself ends in <Space> (e.g. fugitive's
-  -- own "co<Space>" -> ":Git checkout<Space>"), and the mapping pre-fills
-  -- the command line -- including the cwd as an editable default, via the
-  -- same <C-R>=expr<CR> trick fugitive uses for dynamic defaults -- rather
-  -- than submitting anything. The user edits/accepts and hits <CR>
-  -- themselves; :SessionProjectSet's own dir-completion still applies.
+  -- Pre-fills the command line (cwd as an editable default) and stops
+  -- there, so the user edits/accepts and hits <CR> themselves.
   vim.keymap.set("n", "cp<Space>", ":<C-U>SessionProjectSet <C-R>=getcwd()<CR>", {
     buffer = state.buf,
     nowait = true,
@@ -265,8 +239,6 @@ function M.open()
   map("mq", "<Cmd>close<CR>", "close")
   map("g?", "<Cmd>help sessman-list-maps<CR>", "open help at the maps section")
 
-  -- Navigation, fugitive-style (its status buffer's g-prefix is reserved
-  -- entirely for section jumps -- gu/gU/gs/gp/gP/gr -- never actions).
   map("gs", goto_sessions, "go to sessions")
   map("]c", function()
     jump_entry(1)

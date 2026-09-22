@@ -5,9 +5,6 @@ if not ok then
   return M
 end
 
--- ------------------------
--- Directory Picker
--- ------------------------
 function M.pick_directory(cb)
   local home = vim.fn.expand("~")
 
@@ -53,9 +50,6 @@ function M.pick_directory(cb)
   })
 end
 
--- ------------------------
--- Session Picker
--- ------------------------
 function M.pick_session(files, dir, cb)
   local items = vim.tbl_map(function(f)
     return {
