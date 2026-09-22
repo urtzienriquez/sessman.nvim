@@ -123,8 +123,8 @@ COMMANDS                                                    *sessman-commands*
 
                                                               *:SessionSave*
 :SessionSave
-    Open the interactive UI buffer to configure and save a session.
-    See |sessman-ui| for details on the UI interface.
+    Open the interactive UI buffer to configure and save a session. Save
+    with |:wq|, or discard with |:q|. See |sessman-ui| for details.
 
                                                               *:SessionLoad*
 :SessionLoad
@@ -177,16 +177,15 @@ that shows the current sessman state and a log of recent activity. Session,
 ShaDa and project status is reported here instead of transient echo/notify
 messages.
 
-Open it with |:SessionInfo|, |:SessionCurrent|, or the `current` keymap
-(default `<leader>mc`).  A second invocation focuses the existing tab.
+Open it with |:SessionInfo|, |:SessionCurrent|, or `ii` in the
+|sessman-list| buffer.  A second invocation focuses the existing tab.
 
 Typical content: >lua
-
-    Sessman
 
     Session:  /home/user/projects/myapp/Session.vim
     ShaDa:    /home/user/projects/myapp/Session.shada
     Project:  /home/user/projects/myapp
+    Help:     g?
 
     ────────────────────────────────────────
     ●  Loaded Session  /home/user/projects/myapp/Session.vim
@@ -235,16 +234,12 @@ keymap inside it.
 
 Typical content: >lua
 
-    Sessman
-
     Project:  /home/user/projects/myproject
+    Help:     g?
 
     Sessions (2)
     ●  Session.vim
     ○  feature-branch.vim
-
-    ────────────────────────────────────────
-    Help:     g?
 <
 The active/past markers use the same `active_icon`/`past_icon`/
 `active_highlight` config as |sessman-info-config|.
@@ -257,7 +252,8 @@ dd/ss), except R which stays bare:
 
 dd              Delete the session under the cursor (prompts to confirm).
 
-ss              Open |sessman-ui| to save a new session.
+ss              Open |sessman-ui| to save a new session. After saving,
+                the list reopens with the new session marked active.
 
 cp<Space>       Change the project directory. Pre-fills the command line
                 with `:SessionProjectSet ` and the cwd as an editable
@@ -290,9 +286,7 @@ gs              Go to the "Sessions" heading.
 UI BUFFER                                                          *sessman-ui*
 
 When you run |:SessionSave|, an interactive buffer opens with the following
-interface:
-
-    Session
+interface: >
 
     Name:        Session.vim
     Write shada? no
@@ -301,22 +295,23 @@ interface:
     Project: /home/user/projects/myproject
 
     Help:     g?
-
+<
                                                             *sessman-ui-maps*
 Mappings in the UI buffer:
 
 <CR>            Toggle the option under the cursor. On the "Name" line,
                 opens an input prompt to rename the session.
 
-s               Save the session with the displayed settings.
-
-q               Close the sessman buffer.
-
 g?              Open this help documentation at the maps section.
 
 ]c              Jump to the next configuration section.
 
 [c              Jump to the previous configuration section.
+
+There is no mapping to close the buffer: the session is saved when the
+buffer is closed after being written. |:wq| (or |:w| then
+|:q|) saves the session with the displayed settings, while a plain |:q| (or
+|:q!|) discards it.
 
                                                          *sessman-ui-options*
 Options in the UI:
@@ -352,7 +347,7 @@ Sessions in sessman are stored in a project-based directory structure:
 Saving Sessions ~
 
 Sessions can be saved via:
-1. |:SessionSave| - Opens the interactive UI
+1. |:SessionSave| - Opens the interactive UI (save with |:wq|)
 2. `require("sessman").save()` - Programmatic save
 
 When saving:
@@ -360,6 +355,8 @@ When saving:
 • Project directory is stored in the session (g:sessman_project)
 • Current working directory is preserved (g:sessman_cwd)
 • Optionally, a .shada file is saved with the same base name
+• Sessman's own windows (session list, UI and info buffers) are closed
+  first, so they are not recorded in the session
 
                                                       *sessman-session-load*
 Loading Sessions ~

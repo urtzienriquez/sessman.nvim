@@ -57,7 +57,6 @@ local function render()
 
   -- Temporarily lift restrictions to write content
   vim.bo[state.buf].modifiable = true
-  vim.bo[state.buf].readonly = false
 
   local lines = {
     string.format("Name:        %s", state.data.name),
@@ -72,7 +71,7 @@ local function render()
   vim.api.nvim_buf_set_lines(state.buf, 0, -1, false, lines)
 
   vim.bo[state.buf].modifiable = false
-  vim.bo[state.buf].readonly = true
+  vim.bo[state.buf].modified = false
 
   apply_highlights(state.buf, state.data)
 end
@@ -117,7 +116,7 @@ function M.open()
 
   pcall(vim.api.nvim_buf_set_name, state.buf, "sessman://session")
 
-  vim.bo[state.buf].buftype = "nofile"
+  vim.bo[state.buf].buftype = "acwrite"
   vim.bo[state.buf].filetype = "sessman"
   vim.bo[state.buf].bufhidden = "wipe"
 
@@ -133,14 +132,34 @@ function M.open()
     vim.keymap.set("n", lhs, rhs, { buffer = state.buf, silent = true, nowait = true, desc = desc })
   end
 
+  -- :w only marks the session to be saved once the buffer goes away, so :wq
+  -- saves and a plain :q discards.
+  local buf = state.buf
+  local save_on_close = false
+  local group = vim.api.nvim_create_augroup("SessmanUi", { clear = true })
+  vim.api.nvim_create_autocmd("BufWriteCmd", {
+    group = group,
+    buffer = buf,
+    callback = function()
+      save_on_close = true
+      vim.bo[buf].modified = false
+    end,
+  })
+  vim.api.nvim_create_autocmd("BufWipeout", {
+    group = group,
+    buffer = buf,
+    callback = function()
+      if save_on_close then
+        local data = state.data
+        vim.schedule(function()
+          session.save(data.name, { shada = data.write_shada })
+        end)
+      end
+    end,
+  })
+
   map("<CR>", toggle_option, "toggle/edit option under cursor")
 
-  map("s", function()
-    vim.cmd("close")
-    session.save(state.data.name, { shada = state.data.write_shada })
-  end, "save session")
-
-  map("q", "<Cmd>close<CR>", "close")
   map("g?", "<Cmd>help sessman-ui-maps<CR>", "open help at the maps section")
   map("]c", function()
     vim.fn.search([[\v^\w+:]], "W")
