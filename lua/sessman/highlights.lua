@@ -5,8 +5,9 @@ function M.setup()
   local ns = 0
 
   hl(ns, "SessmanHeading", { link = "PreProc" })
-  hl(ns, "SessmanLabel", { link = "Keyword" })
+  hl(ns, "SessmanLabel", { link = "Conditional" })
   hl(ns, "SessmanValue", { link = "Normal" })
+  hl(ns, "SessmanPath", { link = "Function" })
   hl(ns, "SessmanComment", { link = "Comment" })
   hl(ns, "SessmanSeparator", { link = "LineNrNC" })
   hl(ns, "SessmanBoolean", { link = "Boolean" })

@@ -45,7 +45,7 @@ local function apply_highlights(buf, data)
   hi_text(1, data.write_shada and "yes" or "no", "SessmanBoolean")
   hi_line(3, "SessmanSeparator")
   hi_text(4, "Project:", "SessmanLabel")
-  hi_text(4, data.project, "SessmanValue")
+  hi_text(4, data.project, "SessmanPath")
   hi_text(6, "Help:", "SessmanLabel")
   hi_text(6, "g?", "SessmanValue")
 end

@@ -38,7 +38,7 @@ local function build()
     end
   end
 
-  push({ { "Project:  ", "SessmanLabel" }, { state.project, "SessmanValue" } })
+  push({ { "Project:  ", "SessmanLabel" }, { state.project, "SessmanPath" } })
   push({ { "Help:     ", "SessmanLabel" }, { "g?", "SessmanValue" } })
 
   -- Omitted entirely (no heading, no placeholder text) when there are no
