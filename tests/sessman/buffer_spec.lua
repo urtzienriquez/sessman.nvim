@@ -64,18 +64,18 @@ describe("sessman://sessions", function()
     vim.o.splitbelow = false
   end)
 
-  it("shows headers", function()
+  it("shows headers; this plain nvim is (unnamed) under Running", function()
     vim.cmd("Session")
     assert.equals("sessman", vim.bo.filetype)
     assert.equals("nofile", vim.bo.buftype)
     assert.is_false(vim.bo.modifiable)
     local l = lines()
-    assert.equals("Session: none", l[1])
+    assert.equals("Session: (unnamed)", l[1])
     assert.equals("Project: " .. vim.fn.fnamemodify(env.project, ":~"), l[2])
     assert.equals("Help:    g?", l[3])
     assert.equals("", l[4])
-    assert.equals(vim.fn.fnamemodify(env.project, ":~") .. "  current", l[5])
-    assert.equals("", l[6])
+    assert.equals("Running (1)", l[5])
+    assert.same({ "  " .. vim.fn.fnamemodify(env.project, ":~"), "    (unnamed)  current" }, section("Running"))
   end)
 
   it("groups by state: saved sessions by project, current project first", function()
@@ -83,32 +83,32 @@ describe("sessman://sessions", function()
     env.write_session(env.root .. "/aaa", "x")
     env.write_session(env.project, "review")
     vim.cmd("Session")
-    assert.is_nil(section("Running"), "empty sections are omitted")
     assert.same({
       "  " .. vim.fn.fnamemodify(env.project, ":~"),
-      "    coding  saved just now",
-      "    review  saved just now",
+      "    coding  just now",
+      "    review  just now",
       "  " .. vim.fn.fnamemodify(env.root .. "/aaa", ":~"),
-      "    x       saved just now",
+      "    x       just now",
       "  global",
-      "    notes   saved just now",
+      "    notes   just now",
     }, section("Saved"))
   end)
 
-  it("lists running sessions with details; this plain nvim is only on top", function()
+  it("lists running sessions and plain nvims together, by project", function()
     sessman.switch("coding")
     sessman.create("fresh")
     vim.cmd("Session")
     assert.same({
       "  " .. vim.fn.fnamemodify(env.project, ":~"),
-      "    coding  saved just now",
-      "    fresh   never saved",
+      "    (unnamed)  current",
+      "    coding     just now",
+      "    fresh      unsaved",
     }, section("Running"))
-    assert.same({ "  global", "    notes  saved just now" }, section("Saved"))
+    assert.same({ "  global", "    notes  just now" }, section("Saved"))
     assert.is_nil(section("Unnamed nvim"))
   end)
 
-  it("lists other plain nvims at the bottom as Unnamed", function()
+  it("lists other plain nvims under their directory", function()
     local job = vim.fn.jobstart({
       vim.v.progpath,
       "--clean",
@@ -121,10 +121,15 @@ describe("sessman://sessions", function()
     end)
     vim.cmd("Session")
     vim.fn.jobstop(job)
-    assert.same({ "  " .. vim.fn.fnamemodify(env.project .. "/sub", ":~") .. "  plain nvim" }, section("Unnamed nvim"))
+    assert.same({
+      "  " .. vim.fn.fnamemodify(env.project, ":~"),
+      "    (unnamed)  current",
+      "  " .. vim.fn.fnamemodify(env.project .. "/sub", ":~"),
+      "    (unnamed)",
+    }, section("Running"))
   end)
 
-  it("once saved, the current session moves to Running", function()
+  it("once saved, the current nvim is listed by its name", function()
     sessman.save("mine")
     sessman.switch("coding")
     local s = sessman.resolve("coding", sessman.list())
@@ -132,11 +137,10 @@ describe("sessman://sessions", function()
     vim.cmd("Session")
     assert.equals("Session: mine", lines()[1])
     assert.equals("Running (2)", lines()[5])
-    assert.is_nil(section("Unnamed nvim"))
     assert.same({
       "  " .. vim.fn.fnamemodify(env.project, ":~"),
-      "    coding  saved just now, in sub/",
-      "    mine    current, saved just now",
+      "    coding  just now, in sub/",
+      "    mine    current, just now",
     }, section("Running"))
   end)
 
@@ -166,7 +170,7 @@ describe("sessman://sessions", function()
     env.feed("X")
     goto_entry("Saved", "coding")
     env.feed("D")
-    assert.same({ "  global", "    notes  saved just now" }, section("Saved"))
+    assert.same({ "  global", "    notes  just now" }, section("Saved"))
   end)
 
   it("s saves a running session", function()
@@ -196,7 +200,7 @@ describe("sessman://sessions", function()
     env.feed("]]")
     assert.equals("Saved (2)", vim.api.nvim_get_current_line())
     env.feed("[[")
-    assert.equals("Running (1)", vim.api.nvim_get_current_line())
+    assert.equals("Running (2)", vim.api.nvim_get_current_line())
     env.feed("gq")
     assert.equals(1, #vim.api.nvim_list_wins())
     assert.is_nil(env.find_buf("sessman://sessions"))

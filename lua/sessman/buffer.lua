@@ -23,9 +23,9 @@ end
 local function details(s)
   local out = { s.current and "current" or nil }
   if s.unmanaged then
-    return s.current and "current" or "plain nvim"
+    return out[1] or ""
   end
-  out[#out + 1] = s.saved and ("saved " .. ago(s.mtime or os.time())) or "never saved"
+  out[#out + 1] = s.saved and ago(s.mtime or os.time()) or "unsaved"
   if s.running and s.cwd and s.cwd ~= s.project then
     local rel = s.project and vim.fs.relpath(s.project, s.cwd)
     out[#out + 1] = "in " .. (rel and (rel .. "/") or fn.fnamemodify(s.cwd, ":~"))
@@ -37,52 +37,52 @@ local function pad(text, width)
   return text .. (" "):rep(width - fn.strdisplaywidth(text))
 end
 
---- This nvim under the header while it isn't a session, then sections by
---- state, like fugitive's Untracked/Unstaged/Staged; inside them, sessions
---- are grouped by project (the one you are in first).
+local UNNAMED = "(unnamed)"
+
+--- Sections by state, like fugitive's Untracked/Unstaged/Staged; inside
+--- them, sessions are grouped by project (the one you are in first). A plain
+--- nvim is a running nvim without a name: "(unnamed)" in its project.
 ---@param buf integer
 function M.render(buf)
   local sessman = require("sessman")
   local sessions = sessman.list()
   local here = sessman.here()
 
-  local cur
-  local sections = {
-    { title = "Running", list = {} },
-    { title = "Saved", list = {} },
-    { title = "Unnamed nvim", list = {} },
-  }
+  -- The project each entry is listed under; plain nvims by their directory
+  local group = {} ---@type table<sessman.Session, string|false>
+  local sections = { { title = "Running", list = {} }, { title = "Saved", list = {} } }
   for _, s in ipairs(sessions) do
-    if s.current and s.unmanaged then
-      cur = s -- a plain nvim: shown under the header until it's saved
+    if s.unmanaged then
+      local dir = s.name:sub(1, 1) == "/" and s.name
+      group[s] = dir and vim.fs.normalize(vim.fs.root(dir, ".git") or dir) or s.name
     else
-      table.insert(sections[s.unmanaged and 3 or s.running and 1 or 2].list, s)
+      group[s] = s.project
     end
+    table.insert(sections[s.running and 1 or 2].list, s)
   end
 
   local function rank(s)
-    return s.project == here and 0 or s.project and 1 or 2
+    return group[s] == here and 0 or group[s] and 1 or 2
+  end
+  local function name(s)
+    return s.unmanaged and UNNAMED or s.name
   end
   local function before(a, b)
     if rank(a) ~= rank(b) then
       return rank(a) < rank(b)
-    elseif a.project ~= b.project then
-      return a.project < b.project
+    elseif group[a] ~= group[b] then
+      return group[a] < group[b]
     end
-    return a.name < b.name
+    return name(a) < name(b)
   end
 
+  local cur = sessman.current()
   local lines = {
-    "Session: " .. (sessman.current() or { name = "none" }).name,
+    "Session: " .. (cur and cur.name or UNNAMED),
     "Project: " .. fn.fnamemodify(here, ":~"),
     "Help:    g?",
   }
   local st = { entries = {}, groups = {} }
-  if cur then
-    lines[#lines + 1] = ""
-    lines[#lines + 1] = fn.fnamemodify(cur.name, ":~") .. "  " .. details(cur)
-    st.entries[#lines] = cur
-  end
   for _, section in ipairs(sections) do
     if #section.list > 0 then
       table.sort(section.list, before)
@@ -90,22 +90,18 @@ function M.render(buf)
       lines[#lines + 1] = ("%s (%d)"):format(section.title, #section.list)
       st.groups[#st.groups + 1] = #lines
 
-      -- A tree: each project's full path, its sessions indented below it.
-      -- Unnamed nvims are listed directly, by working directory.
+      -- A tree: each project's full path, its sessions indented below it
       local width = 0
       for _, s in ipairs(section.list) do
-        width = math.max(width, fn.strdisplaywidth(s.unmanaged and fn.fnamemodify(s.name, ":~") or s.name))
+        width = math.max(width, fn.strdisplaywidth(name(s)))
       end
       local prev = {} -- no project yet
       for _, s in ipairs(section.list) do
-        local indent, name = "    ", s.name
-        if s.unmanaged then
-          indent, name = "  ", fn.fnamemodify(s.name, ":~")
-        elseif s.project ~= prev then
-          prev = s.project
-          lines[#lines + 1] = "  " .. (s.project and fn.fnamemodify(s.project, ":~") or "global")
+        if group[s] ~= prev then
+          prev = group[s]
+          lines[#lines + 1] = "  " .. (prev and fn.fnamemodify(prev, ":~") or "global")
         end
-        lines[#lines + 1] = ((indent .. pad(name, width) .. "  " .. details(s)):gsub("%s+$", ""))
+        lines[#lines + 1] = (("    " .. pad(name(s), width) .. "  " .. details(s)):gsub("%s+$", ""))
         st.entries[#lines] = s
       end
     end

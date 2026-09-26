@@ -50,7 +50,7 @@ subcommand. `:S` is the short form, like fugitive's `:G`; it isn't defined if
                         A session you leave keeps running. A plain nvim you
                         leave is stopped, unless that would lose something:
                         unsaved changes or a running |:terminal|. Then it
-                        keeps running under "Unnamed nvim".
+                        keeps running, listed as "(unnamed)".
 
 :Session switch -       Go to the running session you left most recently,
                         like `git switch -` or `:cd -`.
@@ -114,39 +114,46 @@ SESSION BUFFER                                                *sessman-buffer*
     Project: ~/Documents/thesis
     Help:    g?
 
-    Running (3)
+    Running (4)
       ~/Documents/thesis
-        coding      never saved
-        manuscript  current, saved 2h ago
+        coding      unsaved
+        manuscript  current, 2h ago
       ~/Documents/GitHub/sessman.nvim
-        coding      saved 1h ago, in lua/
+        (unnamed)
+        coding      1h ago, in lua/
 
     Saved (2)
       ~/Documents/thesis
-        review      saved 3d ago
+        review      3d ago
       global
-        notes       saved 5d ago
-
-    Unnamed nvim (1)
-      ~/Downloads  plain nvim
+        notes       5d ago
 <
-Session:        the session you are in, or "none".
+Session:        the session you are in, or "(unnamed)".
 Project:        the project you are in: where new sessions go.
-                In an nvim that isn't a session yet, a line below the
-                header shows it (`~/dir  current`); `:Session save {name}`
-                makes it a session, which then appears under Running.
-Running         sessions with a live server: going there is instant, and
+Running         nvims with a live server: going there is instant, and
                 everything (buffers, undo, terminals) is as you left it.
 Saved           sessions that only exist as files: going there restores
                 them as they were at their last save.
-Unnamed nvim    other nvim instances that aren't sessions (started with a
-                plain `nvim`). You can go to them, or kill them.
 
 Inside a section, sessions are listed under their project's path (the
 project you are in first, "global" last), so equal names in different
 projects are told apart.
-A running session's working directory is shown when it isn't the project
-root. The buffer refreshes when entered; |:edit| re-reads it.
+
+A "(unnamed)" nvim is one started with a plain `nvim`: running, but not a
+session. It's listed under the git root of its working directory (or the
+directory itself). `:Session save {name}` (or `s` on the current one) makes it
+a session.
+
+Next to each session: "current" (in green, |hl-DiagnosticOk|) for the one
+you are in; when it was last saved ("2h ago"), or "unsaved" (in
+|hl-WarningMsg|) for a running session that has no file yet — a reboot or
+`X` would lose it; `s` saves it. A running session's working directory is
+shown when it isn't the project root ("in lua/"). The buffer refreshes when
+entered; |:edit| re-reads it.
+
+The highlight groups are `sessmanCurrent`, `sessmanUnsaved`, `sessmanUnnamed`,
+`sessmanProject` and `sessmanSection`; link them to others to restyle, e.g.
+`:hi link sessmanCurrent String`.
 
                                                                 *sessman-maps*
 <CR>        Go to the session under the cursor.
