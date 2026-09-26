@@ -1,168 +1,145 @@
--- Per-test sandbox: temp session dir + project dir, stubs for vim.ui /
--- vim.notify, and fake executables on $PATH.
+-- Per-test sandbox: temp session dir, runtime dir (sockets + status files),
+-- config dir for spawned servers, and a project dir.
 local M = {}
 
+local root_dir = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h:h:h")
+
 local originals = {
-  select = vim.ui.select,
-  input = vim.ui.input,
-  notify = vim.notify,
-  path = vim.env.PATH,
+  run = vim.env.XDG_RUNTIME_DIR,
+  config = vim.env.XDG_CONFIG_HOME,
+  data = vim.env.XDG_DATA_HOME,
+  state = vim.env.XDG_STATE_HOME,
+  echo = vim.api.nvim_echo,
+  confirm = vim.fn.confirm,
 }
 
-M.root = nil
-M.session_dir = nil
-M.project = nil
+--- Resolve symlinks (e.g. /tmp on some systems) so paths compare equal to
+--- what getcwd() returns.
+local function realpath(p)
+  return vim.uv.fs_realpath(p) or p
+end
 
---- Drop a module from the cache and require it again, resetting its
---- module-level state.
----@param mod string
 function M.fresh(mod)
   package.loaded[mod] = nil
   return require(mod)
 end
 
---- Resolve symlinks (e.g. /tmp on some systems) so paths compare equal to
---- what getcwd()/fnamemodify(":p") return.
-local function realpath(p)
-  return vim.uv.fs_realpath(p) or p
-end
-
----@param opts? table Extra config passed to sessman.config.set
-function M.setup(opts)
+function M.setup()
   M.root = realpath(vim.fn.tempname())
   vim.fn.mkdir(M.root, "p")
   M.root = realpath(M.root)
-  M.session_dir = M.root .. "/sessions/"
   M.project = M.root .. "/project"
-  vim.fn.mkdir(M.project, "p")
+  vim.fn.mkdir(M.project .. "/sub", "p")
+  vim.g.sessman_dir = M.root .. "/sessions"
+  vim.g.sessman_session = nil
+
+  -- Short runtime dir: socket paths are length limited
+  M.run = realpath(vim.fn.tempname())
+  vim.fn.mkdir(M.run, "p")
+  vim.env.XDG_RUNTIME_DIR = M.run
+
+  -- Spawned servers inherit these: nothing may touch the real XDG dirs.
+  -- Their config puts sessman on the rtp and the same session dir.
+  vim.fn.mkdir(M.root .. "/config/nvim", "p")
+  vim.fn.writefile({
+    ("vim.opt.rtp:prepend(%q)"):format(root_dir),
+    ("vim.g.sessman_dir = %q"):format(vim.g.sessman_dir),
+    "vim.o.swapfile = false",
+  }, M.root .. "/config/nvim/init.lua")
+  vim.env.XDG_CONFIG_HOME = M.root .. "/config"
+  vim.env.XDG_DATA_HOME = M.root .. "/data"
+  vim.env.XDG_STATE_HOME = M.root .. "/state"
 
   M.cwd = vim.fn.getcwd()
+  vim.fn.chdir(M.project)
 
-  require("sessman.config").set(vim.tbl_deep_extend("force", { session_dir = M.session_dir }, opts or {}))
-  vim.g.sessman_project = M.project
-  vim.v.this_session = ""
-  vim.o.shadafile = "NONE"
+  M.echoed = {}
+  vim.api.nvim_echo = function(chunks, ...)
+    M.echoed[#M.echoed + 1] = chunks[1][1]
+    return originals.echo(chunks, ...)
+  end
 
+  M.pids = {}
   return M
 end
 
 function M.teardown()
-  vim.ui.select = originals.select
-  vim.ui.input = originals.input
-  vim.notify = originals.notify
-  vim.env.PATH = originals.path
+  local sessman = require("sessman")
+  for _, s in ipairs(sessman.list()) do
+    if s.running and not s.current and not s.unmanaged then
+      pcall(function()
+        local chan = vim.fn.sockconnect("pipe", s.sock, { rpc = true })
+        vim.rpcnotify(chan, "nvim_command", "qall!")
+        vim.wait(1000, function()
+          return not vim.uv.fs_stat(s.sock)
+        end, 10)
+        vim.fn.chanclose(chan)
+      end)
+    end
+  end
+  pcall(vim.api.nvim_del_augroup_by_name, "sessman_session")
+  for _, addr in ipairs(vim.fn.serverlist()) do
+    if addr:find(M.run, 1, true) then
+      vim.fn.serverstop(addr)
+    end
+  end
+
+  vim.api.nvim_echo = originals.echo
+  vim.fn.confirm = originals.confirm
+  vim.env.XDG_RUNTIME_DIR = originals.run
+  vim.env.XDG_CONFIG_HOME = originals.config
+  vim.env.XDG_DATA_HOME = originals.data
+  vim.env.XDG_STATE_HOME = originals.state
+  vim.g.sessman_session = nil
+  vim.g.sessman_dir = nil
+  vim.o.shadafile = "NONE"
 
   pcall(vim.cmd, "silent! tabonly!")
   pcall(vim.cmd, "silent! only!")
-  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-    if buf ~= vim.api.nvim_get_current_buf() then
-      pcall(vim.api.nvim_buf_delete, buf, { force = true })
-    end
-  end
-  pcall(vim.cmd, "silent! enew!")
-
-  if M.cwd then
-    vim.fn.chdir(M.cwd)
-  end
-  vim.g.sessman_project = nil
-  vim.v.this_session = ""
-  vim.o.shadafile = "NONE"
-
-  if M.root then
-    vim.fn.delete(M.root, "rf")
-  end
-  M.root, M.session_dir, M.project = nil, nil, nil
+  pcall(vim.cmd, "silent! %bwipeout!")
+  vim.fn.chdir(M.cwd)
+  vim.fn.delete(M.root, "rf")
+  vim.fn.delete(M.run, "rf")
 end
 
---- Path of the session directory for the sandbox project.
-function M.project_session_dir()
-  return M.session_dir .. require("sessman.util").encode_path(M.project)
-end
-
---- Write a fake session file in the sandbox project's session dir.
+--- Write a fake saved session.
+---@param project string|false
 ---@param name string
 ---@param lines? string[]
----@param mtime? integer
----@return string path
-function M.write_session(name, lines, mtime)
-  local dir = M.project_session_dir()
-  vim.fn.mkdir(dir, "p")
-  local path = dir .. "/" .. name
-  vim.fn.writefile(lines or { '" fake session' }, path)
-  if mtime then
-    vim.uv.fs_utime(path, mtime, mtime)
-  end
-  return path
+function M.write_session(project, name, lines)
+  local s = require("sessman").new(project, name)
+  vim.fn.mkdir(vim.fs.dirname(s.file), "p")
+  vim.fn.writefile(lines or { '" fake session' }, s.file)
+  return s
 end
 
---- Replace vim.ui.select with a synchronous stub answering `answer`.
---- Returns a table recording each call's items/opts.
----@param answer any
-function M.stub_select(answer)
+---@param answer integer 1 = Yes
+function M.stub_confirm(answer)
   local calls = {}
-  vim.ui.select = function(items, opts, cb)
-    calls[#calls + 1] = { items = items, opts = opts }
-    cb(answer)
+  vim.fn.confirm = function(msg)
+    calls[#calls + 1] = msg
+    return answer
   end
   return calls
 end
 
----@param answer string|nil
-function M.stub_input(answer)
+--- Replace sessman.connect; records calls.
+function M.stub_connect()
   local calls = {}
-  vim.ui.input = function(opts, cb)
-    calls[#calls + 1] = opts
-    cb(answer)
+  require("sessman").connect = function(addr, stop)
+    calls[#calls + 1] = { addr = addr, stop = stop }
   end
   return calls
 end
 
---- Record vim.notify calls instead of displaying them.
----@return table[] { { msg, level }, ... }
-function M.capture_notify()
-  local calls = {}
-  vim.notify = function(msg, level)
-    calls[#calls + 1] = { msg = msg, level = level }
-  end
-  return calls
+--- Evaluate a Lua expression in a running session's server.
+function M.remote(sock, expr)
+  local chan = vim.fn.sockconnect("pipe", sock, { rpc = true })
+  local out = vim.rpcrequest(chan, "nvim_exec_lua", "return " .. expr, {})
+  vim.fn.chanclose(chan)
+  return out
 end
 
---- True if any recorded notification contains `pattern` (plain) at `level`.
-function M.notified(calls, pattern, level)
-  for _, c in ipairs(calls) do
-    if c.msg:find(pattern, 1, true) and (level == nil or c.level == level) then
-      return true
-    end
-  end
-  return false
-end
-
---- Write an executable shell script named `name` into a temp bin dir and
---- prepend it to $PATH.
----@param name string
----@param script string Body of the script (a #!/bin/sh line is added)
-function M.fake_bin(name, script)
-  local bin = (M.root or vim.fn.tempname()) .. "/bin"
-  vim.fn.mkdir(bin, "p")
-  local path = bin .. "/" .. name
-  vim.fn.writefile(vim.split("#!/bin/sh\n" .. script, "\n"), path)
-  vim.fn.setfperm(path, "rwxr-xr-x")
-  if not vim.env.PATH:find(bin, 1, true) then
-    vim.env.PATH = bin .. ":" .. vim.env.PATH
-  end
-  return path
-end
-
---- Names of all buffers currently displayed in a window.
-function M.win_buf_names()
-  local names = {}
-  for _, win in ipairs(vim.api.nvim_list_wins()) do
-    names[#names + 1] = vim.api.nvim_buf_get_name(vim.api.nvim_win_get_buf(win))
-  end
-  return names
-end
-
---- Find a buffer by exact name, or nil.
 function M.find_buf(name)
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(buf) and vim.api.nvim_buf_get_name(buf) == name then
@@ -171,7 +148,6 @@ function M.find_buf(name)
   end
 end
 
---- Run a normal-mode key sequence through the mappings.
 function M.feed(keys)
   vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(keys, true, false, true), "mx", false)
 end

@@ -1,618 +1,188 @@
-*sessman.txt*  Session Manager for Neovim with project organization
+*sessman.txt*  Named sessions that keep running or stay saved
+
+Author:  Urtzi Enriquez-Urzelai
+License: GPL-3.0
 
 ==============================================================================
-CONTENTS                                                    *sessman-contents*
+INTRODUCTION                                                         *sessman*
 
-    1. Introduction ............................ |sessman-introduction|
-    2. Features ................................ |sessman-features|
-    3. Installation ............................ |sessman-installation|
-    4. Configuration ........................... |sessman-configuration|
-    5. Commands ................................ |sessman-commands|
-    6. Info Window .............................. |sessman-info|
-    7. Session List Buffer ..................... |sessman-list|
-    8. UI Buffer ............................... |sessman-ui|
-    9. Session Management ...................... |sessman-sessions|
-   10. Project Management ...................... |sessman-projects|
-   11. Backend Support ......................... |sessman-backends|
-   12. tmux Integration ........................ |sessman-tmux|
-   13. API ..................................... |sessman-api|
-   14. License ................................. |sessman-license|
+A session has a name and belongs to a project directory (or is global). At
+any time it is
 
-==============================================================================
-INTRODUCTION                                            *sessman-introduction*
+  running   an Nvim server your terminal |:connect|s to; it survives closing
+            the terminal, keeping buffers, undo, |:terminal|s and jobs, or
+  saved     a |:mksession| file (plus an optional |shada| file) that survives
+            reboots, or both.
 
-Sessman is a lightweight, project-based session manager for Neovim. It
-organizes sessions by project directory and provides integration with
-tmux-resurrect for seamless environment restoration.
+Going to a session jumps to it when it runs, and otherwise restores it into a
+fresh server. Saving is always explicit. Think of tmux + tmux-resurrect, made
+of Nvim's own |client-server| parts.
 
-Key concepts:
-- Sessions are organized by project directory
-- Multiple sessions per project are supported
-- ShaDa files can be saved with sessions
-- Integration with fuzzy pickers (fzf-lua, telescope, mini.pick, snacks)
-- Interactive UI buffer for session management
+The project is only an anchor, fixed when the session is created: the git
+root of the working directory, or the directory itself. The working directory
+is ordinary session state, so a "manuscript" session can belong to a repo
+while working in its manuscript/ folder.
 
-==============================================================================
-FEATURES                                                    *sessman-features*
+Requires Nvim 0.12+ (|:connect|) on a Unix-like system. Nothing but two
+commands and an autocommand is defined at startup.
 
-• Project-based session organization
-• Automatic or manual project detection
-• Multiple backend support for fuzzy picking
-• Interactive UI buffer for session configuration
-• ShaDa file management per session
-• tmux-resurrect integration
-• Session deletion from picker UI
-• Automatic session restoration with project context
-
-==============================================================================
-INSTALLATION                                            *sessman-installation*
-
-Using Neovim's native package manager: >lua
-
-    vim.pack.add({
-      'https://github.com/urtzienriquez/sessman.nvim',
-    })
-    
-    require("sessman").setup()
-<
-
-Using lazy.nvim: >lua
-
-    {
-      "urtzienriquez/sessman.nvim",
-      config = function()
-        require("sessman").setup({
-          backend = "fzf",  -- or "telescope", "minipick", "snacks", nil
-        })
-      end,
-    }
-<
-
-==============================================================================
-CONFIGURATION                                          *sessman-configuration*
-
-Default configuration: >lua
-
-    require("sessman").setup({
-      -- Picker backend (auto-detected if nil)
-      backend = nil,  -- "fzf" | "telescope" | "minipick" | "snacks" | nil
-
-      -- Session storage directory
-      session_dir = vim.fn.stdpath("data") .. "/session/",
-
-      -- Project detection mode
-      project_detection = "auto",  -- "auto" | "manual"
-    })
-<
-
-                                                     *sessman-config-backend*
-backend ~
-    The fuzzy picker backend to use. Options:
-    • "fzf" - fzf-lua (fast and feature-rich)
-    • "telescope" - telescope.nvim
-    • "minipick" - mini.pick (lightweight)
-    • "snacks" - snacks.nvim
-    • nil - Auto-detect (default)
-
-                                                 *sessman-config-session-dir*
-session_dir ~
-    Directory where session files are stored. Sessions are organized by
-    encoded project paths within this directory.
-    Default: `vim.fn.stdpath("data") .. "/session/"`
-
-                                          *sessman-config-project-detection*
-project_detection ~
-    How to determine the project directory:
-    • "auto" - Automatically set to cwd on VimEnter
-    • "manual" - Require explicit setting via commands
-
-                                                    *sessman-config-keymaps*
-Keymaps ~
-    Sessman sets no keymaps of its own: everything is a command or Lua
-    function (see |sessman-commands| and |sessman-api|), and it's up to
-    your own config to bind whatever you want, e.g.: >lua
-
-    vim.keymap.set("n", "<leader>ms", "<Cmd>SessionLoad<CR>")
-<
-    :SessionLoad opens the |sessman-list| buffer, which has its own
-    buffer-local keymaps for everything else (load/delete/save/project
-    management) -- that buffer is the only thing you need to bind.
+Tip: with Nvim 0.13+, `silent detach!` in your config keeps any plain nvim
+alive when its terminal closes, too (|:detach!|).
 
 ==============================================================================
 COMMANDS                                                    *sessman-commands*
 
-                                                              *:SessionSave*
-:SessionSave
-    Open the interactive UI buffer to configure and save a session. Save
-    with |:wq|, or discard with |:q|. See |sessman-ui| for details.
+                                                                    *:Session*
+:[mods] Session         Open the session buffer |sessman-buffer| in a split at
+                        the top, spanning the full width (at the bottom with
+                        'splitbelow'), like fugitive's `:Git`. [mods] such as
+                        |:vertical|, |:botright| or |:tab| change that. If
+                        it's already visible it is focused.
 
-                                                       *:SessionSaveCurrent*
-:SessionSaveCurrent
-    Save the currently loaded session in place, asking to confirm the
-    overwrite. Its ShaDa file is also saved if it is the one in use. Opens
-    the |sessman-ui| buffer instead when no session is loaded, or when the
-    loaded session does not belong to the current project.
+:Session {target}       Go to {target} |sessman-targets|: jump to it if it's
+                        running, restore it if it's saved, and create it if
+                        it's neither (as |:edit| does for files).
+                        A session you leave keeps running. A plain nvim you
+                        leave is stopped, unless that would lose something:
+                        unsaved changes or a running |:terminal|. Then it
+                        keeps running under "Unnamed nvim".
 
-                                                              *:SessionLoad*
-:SessionLoad
-    Open the |sessman-list| buffer: a persistent session list for the
-    current project, with buffer-local keymaps for load/delete/save/
-    project management. The fuzzy-picker flow is still
-    available programmatically via
-    `require("sessman.picker").pick_session()` for anyone who wants it.
+:Session -              Go to the running session you left most recently.
 
-                                                        *:SessionProjectSet*
-:SessionProjectSet [path]
-    Set the project directory. If [path] is provided, sets it directly.
-    Otherwise, opens an input prompt with directory completion.
+                                                                *:SessionSave*
+:SessionSave            Save the current session to its file. Its ShaDa file
+                        is written too, if it has one. A session that isn't
+                        running comes back as it was at its last save.
 
-                                                       *:SessionProjectPick*
-:SessionProjectPick
-    Use the configured backend to pick a project directory interactively.
-
-                                                      *:SessionProjectClear*
-:SessionProjectClear
-    Clear the current project setting. Falls back to cwd for operations.
-
-*:SessionCurrent*
-:SessionCurrent
-    Open the sessman info window showing the current session and ShaDa file
-    status. See |sessman-info|.
-
-                                                             *:SessionInfo*
-:SessionInfo
-    Toggle the sessman info window. See |sessman-info|.
-
-                                                           *:SessionTmuxSync*
-:SessionTmuxSync
-    Sync the current Neovim session with tmux-resurrect. See |sessman-tmux|
-    for details on tmux integration.
-
-                                                       *:SessionDebugStart*
-:SessionDebugStart
-    Enable debug logging to `stdpath("state")/sessman-debug.log`.
-
-                                                        *:SessionDebugStop*
-:SessionDebugStop
-    Disable debug logging.
+:SessionSave[!] {target}
+                        Make this plain nvim a session named {target} and
+                        save it. Fails if {target} is already saved, unless
+                        [!] is given. A session's name can't be changed.
 
 ==============================================================================
-INFO WINDOW                                                      *sessman-info*
+TARGETS                                                      *sessman-targets*
 
-The info window is a scratch buffer opened in a new tab (like |:checkhealth|)
-that shows the current sessman state and a log of recent activity. Session,
-ShaDa and project status is reported here instead of transient echo/notify
-messages.
+    name              a session of the project you are in, else a global one;
+                      new sessions go to the project you are in
+    global/name       a global session
+    project/name      a session of the project with that directory name
+    ~/path/name       a session of the project at that path
 
-Open it with |:SessionInfo|, |:SessionCurrent|, or `ii` in the
-|sessman-list| buffer.  A second invocation focuses the existing tab.
+The project you are in is the git root of the working directory, or the
+working directory itself outside a git repository.
 
-Typical content: >lua
-
-    Session:  /home/user/projects/myapp/Session.vim
-    ShaDa:    /home/user/projects/myapp/Session.shada
-    Project:  /home/user/projects/myapp
-    Help:     g?
-
-    ────────────────────────────────────────
-    ●  Loaded Session  /home/user/projects/myapp/Session.vim
-    ●  Loaded ShaDa    /home/user/projects/myapp/Session.shada
-    ○  Loaded Session  /home/user/projects/other/v1.vim
-
-The top section always reflects live state: the session is `v:this_session`,
-the ShaDa is `'shadafile'`, and the project is |sessman-projects|.
-
-The activity log keeps the last ~15 session/shada/project operations.  The
-most recently loaded session and ShaDa are marked with a full green circle
-(the `active_icon`, highlight `DiagnosticOk`); older loaded entries use an
-empty circle (the `past_icon`).  The entry text uses the same highlight in
-every case, so the marker alone distinguishes the current load.  Other events
-(saved, deleted, project changes) are shown without a prefix icon.
-
-                                                       *sessman-info-config*
-Options (in |sessman.setup|): >lua
-
-    info = {
-      active_icon = "●",          -- full green circle: current session/ShaDa
-      past_icon   = "○",          -- empty circle: past loaded entries
-      active_highlight = "DiagnosticOk",  -- green highlight for the active marker
-    }
-
-You can replace `active_icon` / `past_icon` with any unicode string, e.g.
-Nerd Font glyphs, without affecting functionality.
-
-                                                           *sessman-info-maps*
-Mappings in the info window:
-
-mq              Close the info tab (wipe the buffer).
-
-g?              Open this help documentation at the maps section.
-
-The buffer is not listed and is wiped when closed.  It is opened on demand;
-it never pops up automatically.
+Completion lists every session, fuzzily matched, so `:Session <Tab>` works as
+a fuzzy session picker.
 
 ==============================================================================
-SESSION LIST BUFFER                                              *sessman-list*
+SESSION BUFFER                                                *sessman-buffer*
 
-|:SessionLoad| opens a persistent buffer listing the sessions for the
-current project, instead of a fuzzy-picker popup. It is the one thing
-meant to be bound in your own config -- everything else is a buffer-local
-keymap inside it.
+`:Session` shows every session by state, like fugitive's summary buffer:
+>
+    Session: manuscript
+    Project: ~/Documents/thesis
+    Help:    g?
 
-Typical content: >lua
+    Running (3)
+      ~/Documents/thesis
+        coding      never saved
+        manuscript  current, saved 2h ago
+      ~/Documents/GitHub/sessman.nvim
+        coding      saved 1h ago, in lua/
 
-    Project:  /home/user/projects/myproject
-    Help:     g?
+    Saved (2)
+      ~/Documents/thesis
+        review      saved 3d ago
+      global
+        notes       saved 5d ago
 
-    Sessions (2)
-    ●  Session.vim
-    ○  feature-branch.vim
+    Unnamed nvim (1)
+      ~/Downloads  plain nvim
 <
-The active/past markers use the same `active_icon`/`past_icon`/
-`active_highlight` config as |sessman-info-config|.
+Session:        the session you are in, or "none".
+Project:        the project you are in: where new sessions go.
+                In an nvim that isn't a session yet, a line below the
+                header shows it (`~/dir  current`); `:SessionSave {name}`
+                makes it a session, which then appears under Running.
+Running         sessions with a live server: going there is instant, and
+                everything (buffers, undo, terminals) is as you left it.
+Saved           sessions that only exist as files: going there restores
+                them as they were at their last save.
+Unnamed nvim    other nvim instances that aren't sessions (started with a
+                plain `nvim`). You can go to them, or kill them.
 
-                                                         *sessman-list-maps*
-Mappings in the session list buffer. Actions are doubled-letter (e.g.
-dd/ss), except R which stays bare:
+Inside a section, sessions are listed under their project's path (the
+project you are in first, "global" last), so equal names in different
+projects are told apart.
+A running session's working directory is shown when it isn't the project
+root. The buffer refreshes when entered; |:edit| re-reads it.
 
-<CR>            Load the session under the cursor.
-
-dd              Delete the session under the cursor (prompts to confirm).
-
-ss              Open |sessman-ui| to save a new session. After saving,
-                the list reopens with the new session marked active.
-
-cp<Space>       Change the project directory. Pre-fills the command line
-                with `:SessionProjectSet ` and the cwd as an editable
-                default -- edit and press <CR>, or <Esc> to cancel.
-
-pp              Pick a project directory via the configured picker
-                backend.
-
-cx              Clear the project directory (falls back to cwd).
-
-ci              Toggle |sessman-info|.
-
-T               Sync with tmux-resurrect (|:SessionTmuxSync|).
-
-R               Refresh the list.
-
-mq              Close the buffer.
-
-g?              Open this help documentation at the maps section.
-
-Navigation (the g-prefix is reserved for section jumps, never actions):
-
-gs              Go to the "Sessions" heading.
-
-]c              Jump to the next session entry (wraps).
-
-[c              Jump to the previous session entry (wraps).
+                                                                *sessman-maps*
+<CR>        Go to the session under the cursor.
+s           Save it (also a running session elsewhere). On the current
+            unnamed nvim, start `:SessionSave `.
+S           Save it and start or update its ShaDa file.
+X           Kill it: stop its server, keep its files. Killing the current
+            session moves you to the previous one, or quits.
+D           Delete it: remove its files, and kill it if it runs.
+co<Space>   Start `:Session ` on the command line.
+cs<Space>   Start `:SessionSave ` on the command line.
+)  (        Next/previous session.
+]]  [[      Next/previous group.
+gq          Close the buffer.
+g?          Show this help.
 
 ==============================================================================
-UI BUFFER                                                          *sessman-ui*
+CONFIGURATION                                                 *sessman-config*
 
-When you run |:SessionSave|, an interactive buffer opens with the following
-interface: >
-
-    Name:        Session.vim
-    Write shada? no
-
-    ────────────────────────────────────────
-    Project: /home/user/projects/myproject
-
-    Help:     g?
+*g:sessman_dir*   Where sessions are saved.
+                Default: `stdpath("data") .. "/session"`
+>lua
+    vim.g.sessman_dir = vim.fn.expand("~/sessions")
 <
-                                                            *sessman-ui-maps*
-Mappings in the UI buffer:
+Session files for a project live in a directory named after its path, with
+"/" replaced by "%"; global ones in "global/". Sessions are plain
+|:mksession| files, so 'sessionoptions' decides what they contain.
 
-<CR>            Toggle the option under the cursor. On the "Name" line,
-                opens an input prompt to rename the session.
-
-g?              Open this help documentation at the maps section.
-
-]c              Jump to the next configuration section.
-
-[c              Jump to the previous configuration section.
-
-There is no mapping to close the buffer: the session is saved when the
-buffer is closed after being written. |:wq| (or |:w| then
-|:q|) saves the session with the displayed settings, while a plain |:q| (or
-|:q!|) discards it.
-
-                                                         *sessman-ui-options*
-Options in the UI:
-
-Name ~
-    The filename for the session (must end in .vim). Press <CR> on this
-    line to edit the name.
-
-Write shada? ~
-    Whether to save a ShaDa file alongside the session. Toggle with <CR>.
-    ShaDa files preserve marks, registers, command history, and more.
-
-Project ~
-    The current project directory (read-only in the UI). Change via
-    |:SessionProjectSet| or |:SessionProjectPick|.
-
-==============================================================================
-SESSION MANAGEMENT                                          *sessman-sessions*
-
-Sessions in sessman are stored in a project-based directory structure:
-
-    ~/.local/share/nvim/session/
-    ├── %home%user%projects%myproject/
-    │   ├── Session.vim
-    │   ├── Session.shada
-    │   ├── feature-branch.vim
-    │   └── bugfix.vim
-    └── %home%user%work%client/
-        ├── Session.vim
-        └── development.vim
-
-                                                      *sessman-session-save*
-Saving Sessions ~
-
-Sessions can be saved via:
-1. |:SessionSave| - Opens the interactive UI (save with |:wq|)
-2. |:SessionSaveCurrent| - Overwrites the loaded session (asks to confirm)
-3. `require("sessman").save()` - Programmatic save
-
-When saving:
-• The session file contains window layouts, buffer lists, and settings
-• Project directory is stored in the session (g:sessman_project)
-• Current working directory is preserved (g:sessman_cwd)
-• Optionally, a .shada file is saved with the same base name
-• Sessman's own windows (session list, UI and info buffers) are closed
-  first, so they are not recorded in the session
-
-                                                      *sessman-session-load*
-Loading Sessions ~
-
-Sessions can be loaded via:
-1. |:SessionLoad| - Opens the |sessman-list| buffer
-2. `require("sessman").load()` - Programmatic load
-
-When loading:
-• All unsaved changes prompt a warning
-• Current buffers are wiped
-• Session file is sourced
-• ShaDa file is automatically loaded if it exists
-• Working directory is restored to the saved location
-• Load status is recorded in the info window |sessman-info|
-
-                                                    *sessman-session-delete*
-Deleting Sessions ~
-
-In the |sessman-list| buffer (|:SessionLoad|), press `dd` on a session to
-delete it (prompts to confirm). Both the .vim and .shada files are
-removed. If the project directory becomes empty after deletion, it is
-also removed. The fuzzy-picker backends have their own delete keybind
-(e.g. <C-x>) when using `require("sessman.picker").pick_session()`
-directly -- see |sessman-backends|.
-
-==============================================================================
-PROJECT MANAGEMENT                                          *sessman-projects*
-
-Projects are the organizational unit for sessions. Each project can have
-multiple named sessions.
-
-                                                      *sessman-project-auto*
-Automatic Detection ~
-
-When `project_detection = "auto"` (default), the project is automatically
-set to the current working directory on VimEnter.
-
-                                                    *sessman-project-manual*
-Manual Setting ~
-
-Set the project explicitly with:
-• |:SessionProjectSet| [path] - Set to a specific path
-• |:SessionProjectPick| - Pick interactively via picker
-
-                                                   *sessman-project-current*
-Current Project ~
-
-The current project is stored in `g:sessman_project` and can be viewed with
-|:SessionCurrent|.
-
-                                                   *sessman-project-encoded*
-Path Encoding ~
-
-Project paths are encoded for use as directory names by replacing `/` with
-`%`. This creates unique, filesystem-safe directory names for each project.
-
-Example:
-    /home/user/projects/myapp → %home%user%projects%myapp
-
-==============================================================================
-BACKEND SUPPORT                                              *sessman-backends*
-
-Sessman supports multiple fuzzy picker backends for selecting sessions and
-projects.
-
-                                                   *sessman-backend-fzf-lua*
-fzf-lua ~
-    Fast and feature-rich picker with native performance.
-    Requires: https://github.com/ibhagwan/fzf-lua
-
-    Features:
-    • <C-h> - Toggle hidden files in project picker
-    • <C-x> - Delete session in session picker
-    • Fast previews and filtering
-
-                                                 *sessman-backend-telescope*
-telescope.nvim ~
-    Popular picker with extensive customization options.
-    Requires: https://github.com/nvim-telescope/telescope.nvim
-
-    Features:
-    • <C-o> - Toggle hidden files in project picker
-    • <C-x> - Delete session in session picker
-    • Full telescope configuration support
-
-                                                  *sessman-backend-minipick*
-mini.pick ~
-    Lightweight picker from mini.nvim collection.
-    Requires: https://github.com/echasnovski/mini.nvim
-
-    Features:
-    • <C-o> - Toggle hidden files in project picker
-    • <C-x> - Delete session in session picker
-    • Minimal dependencies
-
-                                                    *sessman-backend-snacks*
-snacks.nvim ~
-    Modern picker with a polished interface.
-    Requires: https://github.com/folke/snacks.nvim
-
-    Features:
-    • <C-h> - Toggle hidden files in project picker
-    • <C-x> - Delete session in session picker
-    • Modern UI styling
-
-                                                *sessman-backend-autodetect*
-Auto-detection ~
-
-If `backend = nil` in configuration, sessman detects backends in this order:
-1. fzf-lua
-2. telescope
-3. mini.pick
-4. snacks
-
-The first available backend is used automatically.
-
-==============================================================================
-TMUX INTEGRATION                                                *sessman-tmux*
-
-Sessman can integrate with tmux-resurrect to automatically restore Neovim
-sessions when tmux resurrects a saved environment.
-
-                                                      *sessman-tmux-workflow*
-Workflow ~
-
-1. Save a Neovim session with |:SessionSave|
-2. Run |:SessionTmuxSync| to update the tmux-resurrect file
-3. Save your tmux environment (usually <prefix> <C-s>)
-4. When tmux resurrects, Neovim will load with your session
-
-                                                  *sessman-tmux-compatibility*
-Compatibility ~
-
-Sessman supports both:
-
-• Original tmux-resurrect
-  Location: ~/.tmux/resurrect/last or ~/.local/share/tmux/resurrect/last
-  Uses a single file with all sessions
-
-• Forked tmux-resurrect (urtzienriquez/tmux-resurrect)
-  Location: ~/.local/share/tmux/resurrect/saved/
-  Uses per-session files
-
-Detection is automatic.
-
-                                                  *sessman-tmux-requirements*
-Requirements ~
-
-• Running inside a tmux session
-• tmux-resurrect installed and configured
-• At least one tmux-resurrect save has been made
-• An active Neovim session (saved with |:SessionSave|)
-
-                                                         *sessman-tmux-files*
-Resurrect File Format ~
-
-Sessman modifies the pane entry in the tmux-resurrect file to include:
-    :nvim -S '/path/to/session.vim'
-
-This ensures Neovim starts with the correct session when the pane is
-restored.
-
-==============================================================================
-API                                                              *sessman-api*
-
-Sessman provides a Lua API for programmatic control.
-
-                                                          *sessman.setup()*
-sessman.setup({opts})
-    Initialize sessman with custom configuration.
-    
-    Parameters: ~
-        {opts}  Optional table with configuration options.
-                See |sessman-configuration|.
-
-                                                            *sessman.save()*
-sessman.save()
-    Open the interactive UI to save a session.
-    Equivalent to |:SessionSave|.
-
-                                                    *sessman.save_current()*
-sessman.save_current()
-    Save the currently loaded session in place, asking to confirm the
-    overwrite. Meant to be mapped in your config, e.g. >lua
-        vim.keymap.set("n", "<leader>mw", require("sessman").save_current)
+No mappings are defined; for instance: >lua
+    vim.keymap.set("n", "<leader>ss", "<Cmd>Session<CR>",
+      { desc = "Session list" })
+    vim.keymap.set("n", "<leader>sp", "<Cmd>Session -<CR>",
+      { desc = "Previous session" })
+    vim.keymap.set("n", "<leader>sl", function() require("sessman").pick() end,
+      { desc = "Pick a session" })
 <
-    Equivalent to |:SessionSaveCurrent|.
+Keep `require()` inside the function, as above, so sessman still loads only
+when the map is used.
+==============================================================================
+LUA API                                                          *sessman-api*
 
-                                                            *sessman.load()*
-sessman.load()
-    Open the picker to load a session.
-    Equivalent to |:SessionLoad|.
+require("sessman") ~
 
-                                                     *sessman.project_set()*
-sessman.project_set({path})
-    Set the project directory.
-    
-    Parameters: ~
-        {path}  Optional string path. If nil, prompts for input.
-    
-    Equivalent to |:SessionProjectSet|.
+  go({target})         Same as `:Session {target}`.
+  save([{target}], [{opts}])
+                       Same as `:SessionSave`. {opts}: `bang`, `shada`.
+  pick()               Choose a session with |vim.ui.select()|, and so with
+                       any picker that replaces it.
+  list()               All sessions: tables with `project` (false when
+                       global), `name`, `file`, `sock`, and `saved`,
+                       `running`, `current`, `cwd`, and `unmanaged` (an
+                       unnamed nvim) when true.
+  current()            The current session, or nil in a plain nvim.
 
-                                                    *sessman.project_pick()*
-sessman.project_pick()
-    Use the picker to select a project directory.
-    Equivalent to |:SessionProjectPick|.
-
-                                                   *sessman.project_clear()*
-sessman.project_clear()
-    Clear the current project setting.
-    Equivalent to |:SessionProjectClear|.
-
-                                                         *sessman.current()*
-sessman.current()
-    Open the info window showing the current session and ShaDa status.
-    Equivalent to |:SessionCurrent|.
-
-                                                            *sessman.info()*
-sessman.info()
-    Toggle the info window |sessman-info|.
-    Equivalent to |:SessionInfo|.
-
-                                                      *sessman.tmux_sync()*
-sessman.tmux_sync()
-    Sync session with tmux-resurrect.
-    Equivalent to |:SessionTmuxSync|.
-
-                                                     *sessman.debug_start()*
-sessman.debug_start()
-    Enable debug logging.
-    Equivalent to |:SessionDebugStart|.
-
-                                                      *sessman.debug_stop()*
-sessman.debug_stop()
-    Disable debug logging.
-    Equivalent to |:SessionDebugStop|.
-
-                                                           *sessman.debug()*
-sessman.debug()
-    Print current configuration and state to messages.
+*g:sessman_session* is `{ project = ..., name = ... }` inside a session, e.g.
+for a statusline.
 
 ==============================================================================
-LICENSE                                                      *sessman-license*
+INTERNALS                                                  *sessman-internals*
 
-GNU General Public License v3.0
+A running session listens on a socket in `stdpath("run") .. "/sessman/"` and
+keeps a small status file next to it (working directory, pid, when it was
+last left), so listing never waits on a busy server. Restoring runs
+`nvim --headless --listen {socket}` with the session and ShaDa files, then
+|:connect|s to it.
 
-See LICENSE file in the repository for full text.
+The server half is adapted from servery.nvim
+(https://github.com/wurli/servery.nvim, MIT, (c) servery.nvim authors).
 
-==============================================================================
-vim:tw=78:ts=8:ft=help:norl:
+ vim:tw=78:ts=8:ft=help:norl:
