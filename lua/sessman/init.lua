@@ -282,10 +282,32 @@ function M.resolve(target, sessions)
   return nil, "unknown project: " .. proj
 end
 
---- :Session completion (fuzzy).
+local subcommands = { "switch", "new", "save", "kill", "delete" }
+
+---@param items string[]
 ---@param arglead string
+local function filter(items, arglead)
+  return arglead == "" and items or fn.matchfuzzy(items, arglead)
+end
+
+--- :Session completion: subcommands, then sessions (fuzzy), or directories
+--- for :Session new.
+---@param arglead string
+---@param cmdline? string
 ---@return string[]
-function M.complete(arglead)
+function M.complete(arglead, cmdline)
+  -- Arguments after the command name (:Session or :S; modifiers are lowercase)
+  local args = (cmdline or ""):match("%f[%w]S%w*!?%s+(.*)$") or ""
+  local words = vim.split(args, "%s+", { trimempty = true })
+  local position = #words + (arglead == "" and 1 or 0)
+  if position <= 1 then
+    return filter(subcommands, arglead)
+  elseif position > 2 then
+    return {}
+  elseif words[1] == "new" then
+    return fn.getcompletion(arglead, "dir")
+  end
+
   local sessions = M.list()
   local here = M.here()
   local items = {}
@@ -295,7 +317,61 @@ function M.complete(arglead)
     end
   end
   table.sort(items)
-  return arglead == "" and items or fn.matchfuzzy(items, arglead)
+  if words[1] == "switch" then
+    table.insert(items, 1, "-")
+  end
+  return filter(items, arglead)
+end
+
+--- The :Session command.
+---@param o table Arguments of nvim_create_user_command's callback
+function M.command(o)
+  local sub, target = o.fargs[1], o.fargs[2]
+  if not sub then
+    return require("sessman.buffer").open(o.mods)
+  elseif #o.fargs > 2 then
+    return err("too many arguments")
+  end
+
+  local function need_target()
+    if not target then
+      err(("argument required: :Session %s {session}"):format(sub))
+    end
+    return target
+  end
+  local function find(t)
+    local s, msg = M.resolve(t, M.list())
+    if not s then
+      err(msg)
+    elseif not (s.running or s.saved or s.unmanaged) then
+      err("no session " .. t)
+      s = nil
+    end
+    return s
+  end
+
+  if sub == "switch" then
+    return need_target() and M.switch(target)
+  elseif sub == "new" then
+    return need_target() and M.create(target)
+  elseif sub == "save" then
+    return M.save(target, { bang = o.bang })
+  elseif sub == "kill" then
+    if not target then
+      for _, s in ipairs(M.list()) do
+        if s.current then
+          return M.kill(s)
+        end
+      end
+      return
+    end
+    local s = find(target)
+    return s and M.kill(s)
+  elseif sub == "delete" then
+    local s = need_target() and find(target)
+    return s and M.delete(s)
+  end
+  err(("unknown subcommand '%s' (%s)"):format(sub, table.concat(subcommands, ", ")))
 end
 
 --- The running session left most recently, other than this one.
@@ -427,9 +503,10 @@ function M.open(s, opts)
   end
 end
 
---- :Session {target}
+--- :Session switch {target}: jump to a running session or restore a saved
+--- one. "-" is the previous session.
 ---@param target string
-function M.go(target)
+function M.switch(target)
   local sessions = M.list()
   local s, msg
   if target == "-" then
@@ -439,6 +516,20 @@ function M.go(target)
   end
   if not s then
     return err(msg)
+  elseif not (s.running or s.saved or s.unmanaged) then
+    return err(("no session %s; to create it: :Session new %s"):format(target, target))
+  end
+  M.open(s)
+end
+
+--- :Session new {target}: create a fresh session and switch to it.
+---@param target string
+function M.create(target)
+  local s, msg = M.resolve(target, M.list())
+  if not s then
+    return err(msg)
+  elseif s.running or s.saved then
+    return err(("%s exists; to go there: :Session switch %s"):format(target, target))
   end
   M.open(s)
 end
@@ -501,7 +592,7 @@ function M.attach()
   })
 end
 
---- :SessionSave[!] [name]
+--- :Session save[!] [name]
 ---@param name? string Name for a plain nvim (adopts it as a session)
 ---@param opts? { bang?: boolean, shada?: boolean }
 function M.save(name, opts)

@@ -1,5 +1,10 @@
+:S	sessman.txt	/*:S*
 :Session	sessman.txt	/*:Session*
-:SessionSave	sessman.txt	/*:SessionSave*
+:Session-delete	sessman.txt	/*:Session-delete*
+:Session-kill	sessman.txt	/*:Session-kill*
+:Session-new	sessman.txt	/*:Session-new*
+:Session-save	sessman.txt	/*:Session-save*
+:Session-switch	sessman.txt	/*:Session-switch*
 g:sessman_dir	sessman.txt	/*g:sessman_dir*
 g:sessman_session	sessman.txt	/*g:sessman_session*
 sessman	sessman.txt	/*sessman*

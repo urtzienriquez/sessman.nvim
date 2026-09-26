@@ -1,6 +1,6 @@
 local env = require("tests.helpers.env")
 
-describe(":SessionSave", function()
+describe(":Session save", function()
   local sessman
 
   before_each(function()

@@ -23,8 +23,8 @@ root of the working directory, or the directory itself. The working directory
 is ordinary session state, so a "manuscript" session can belong to a repo
 while working in its manuscript/ folder.
 
-Requires Nvim 0.12+ (|:connect|) on a Unix-like system. Nothing but two
-commands and an autocommand is defined at startup.
+Requires Nvim 0.12+ (|:connect|) on a Unix-like system. Nothing but the
+`:Session` and `:S` commands and an autocommand is defined at startup.
 
 Tip: with Nvim 0.13+, `silent detach!` in your config keeps any plain nvim
 alive when its terminal closes, too (|:detach!|).
@@ -32,32 +32,53 @@ alive when its terminal closes, too (|:detach!|).
 ==============================================================================
 COMMANDS                                                    *sessman-commands*
 
-                                                                    *:Session*
+One command, like fugitive's `:Git`: the first argument is always a
+subcommand. `:S` is the short form, like fugitive's `:G`; it isn't defined if
+`:S` already exists when sessman loads (vim-abolish's `:Subvert` is `:S` too).
+
+                                                                *:Session* *:S*
 :[mods] Session         Open the session buffer |sessman-buffer| in a split at
                         the top, spanning the full width (at the bottom with
                         'splitbelow'), like fugitive's `:Git`. [mods] such as
                         |:vertical|, |:botright| or |:tab| change that. If
                         it's already visible it is focused.
 
-:Session {target}       Go to {target} |sessman-targets|: jump to it if it's
-                        running, restore it if it's saved, and create it if
-                        it's neither (as |:edit| does for files).
+                                                             *:Session-switch*
+:Session switch {target}
+                        Go to {target} |sessman-targets|: jump to it if it's
+                        running, restore it if it's saved.
                         A session you leave keeps running. A plain nvim you
                         leave is stopped, unless that would lose something:
                         unsaved changes or a running |:terminal|. Then it
                         keeps running under "Unnamed nvim".
 
-:Session -              Go to the running session you left most recently.
+:Session switch -       Go to the running session you left most recently,
+                        like `git switch -` or `:cd -`.
 
-                                                                *:SessionSave*
-:SessionSave            Save the current session to its file. Its ShaDa file
+                                                                *:Session-new*
+:Session new {target}   Create a new, empty session {target} and go to it,
+                        like tmux `new-session`. It starts in the project's
+                        directory (or in the current directory, if that is
+                        inside the project).
+
+                                                               *:Session-save*
+:Session save           Save the current session to its file. Its ShaDa file
                         is written too, if it has one. A session that isn't
                         running comes back as it was at its last save.
 
-:SessionSave[!] {target}
+:Session[!] save {target}
                         Make this plain nvim a session named {target} and
                         save it. Fails if {target} is already saved, unless
                         [!] is given. A session's name can't be changed.
+
+                                                               *:Session-kill*
+:Session kill [target]  Stop a running session: its server quits, its files
+                        stay. Without [target], the current session: you
+                        move to the previous one, or Nvim quits.
+
+                                                             *:Session-delete*
+:Session delete {target}
+                        Kill {target} if it runs and remove its files.
 
 ==============================================================================
 TARGETS                                                      *sessman-targets*
@@ -71,8 +92,9 @@ TARGETS                                                      *sessman-targets*
 The project you are in is the git root of the working directory, or the
 working directory itself outside a git repository.
 
-Completion lists every session, fuzzily matched, so `:Session <Tab>` works as
-a fuzzy session picker.
+Completion offers the subcommands, then every session, fuzzily matched, so
+`:S switch <Tab>` works as a fuzzy session picker. For `:Session new` it
+completes directories: type the path, then `/name`.
 
 ==============================================================================
 SESSION BUFFER                                                *sessman-buffer*
@@ -102,7 +124,7 @@ SESSION BUFFER                                                *sessman-buffer*
 Session:        the session you are in, or "none".
 Project:        the project you are in: where new sessions go.
                 In an nvim that isn't a session yet, a line below the
-                header shows it (`~/dir  current`); `:SessionSave {name}`
+                header shows it (`~/dir  current`); `:Session save {name}`
                 makes it a session, which then appears under Running.
 Running         sessions with a live server: going there is instant, and
                 everything (buffers, undo, terminals) is as you left it.
@@ -120,13 +142,14 @@ root. The buffer refreshes when entered; |:edit| re-reads it.
                                                                 *sessman-maps*
 <CR>        Go to the session under the cursor.
 s           Save it (also a running session elsewhere). On the current
-            unnamed nvim, start `:SessionSave `.
+            unnamed nvim, start `:Session save `.
 S           Save it and start or update its ShaDa file.
 X           Kill it: stop its server, keep its files. Killing the current
             session moves you to the previous one, or quits.
 D           Delete it: remove its files, and kill it if it runs.
-co<Space>   Start `:Session ` on the command line.
-cs<Space>   Start `:SessionSave ` on the command line.
+co<Space>   Start `:Session switch ` on the command line.
+cn<Space>   Start `:Session new ` on the command line.
+cs<Space>   Start `:Session save ` on the command line.
 )  (        Next/previous session.
 ]]  [[      Next/previous group.
 gq          Close the buffer.
@@ -147,7 +170,7 @@ Session files for a project live in a directory named after its path, with
 No mappings are defined; for instance: >lua
     vim.keymap.set("n", "<leader>ss", "<Cmd>Session<CR>",
       { desc = "Session list" })
-    vim.keymap.set("n", "<leader>sp", "<Cmd>Session -<CR>",
+    vim.keymap.set("n", "<leader>sp", "<Cmd>Session switch -<CR>",
       { desc = "Previous session" })
     vim.keymap.set("n", "<leader>sl", function() require("sessman").pick() end,
       { desc = "Pick a session" })
@@ -163,9 +186,10 @@ LUA API                                                          *sessman-api*
 
 require("sessman") ~
 
-  go({target})         Same as `:Session {target}`.
+  switch({target})     Same as `:Session switch {target}`.
+  create({target})     Same as `:Session new {target}`.
   save([{target}], [{opts}])
-                       Same as `:SessionSave`. {opts}: `bang`, `shada`.
+                       Same as `:Session save`. {opts}: `bang`, `shada`.
   pick()               Choose a session with |vim.ui.select()|, and so with
                        any picker that replaces it.
   list()               All sessions: tables with `project` (false when
@@ -180,7 +204,7 @@ for a statusline.
 ==============================================================================
 HEADLESS START                                              *sessman-headless*
 
-A session restored or created by `:Session` starts as a headless Nvim: your
+A session restored or created by sessman starts as a headless Nvim: your
 config runs before your terminal |:connect|s, so no UI is attached yet
 (`#vim.api.nvim_list_uis() == 0`). Config that needs a UI at startup won't
 see one. For example `require("vim._core.ui2").enable()` does nothing
@@ -195,7 +219,7 @@ Run such config on |UIEnter| when Nvim starts without a UI: >lua
       vim.api.nvim_create_autocmd("UIEnter", { once = true, callback = ui2 })
     end
 <
-A plain `nvim` behaves as before. Sessions made with `:SessionSave {name}`
+A plain `nvim` behaves as before. Sessions made with `:Session save {name}`
 from a plain nvim are not affected: that nvim started with a UI.
 
 ==============================================================================

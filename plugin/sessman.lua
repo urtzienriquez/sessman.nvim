@@ -5,21 +5,24 @@ if vim.g.loaded_sessman then
 end
 vim.g.loaded_sessman = 1
 
-local function complete(arglead)
-  return require("sessman").complete(arglead)
+local opts = {
+  nargs = "*",
+  bang = true,
+  bar = true,
+  complete = function(arglead, cmdline)
+    return require("sessman").complete(arglead, cmdline)
+  end,
+  desc = "Sessions: list, switch, new, save, kill, delete",
+}
+local function command(o)
+  require("sessman").command(o)
 end
 
-vim.api.nvim_create_user_command("Session", function(o)
-  if o.args == "" then
-    require("sessman.buffer").open(o.mods)
-  else
-    require("sessman").go(o.args)
-  end
-end, { nargs = "?", complete = complete, desc = "Open the session list, or go to a session" })
-
-vim.api.nvim_create_user_command("SessionSave", function(o)
-  require("sessman").save(o.args ~= "" and o.args or nil, { bang = o.bang })
-end, { nargs = "?", bang = true, complete = complete, desc = "Save the current session" })
+vim.api.nvim_create_user_command("Session", command, opts)
+-- Short form, like fugitive's :G. Left alone if :S exists (e.g. vim-abolish).
+if vim.fn.exists(":S") ~= 2 then
+  vim.api.nvim_create_user_command("S", command, opts)
+end
 
 vim.api.nvim_create_autocmd("BufReadCmd", {
   group = vim.api.nvim_create_augroup("sessman_buffer", {}),

@@ -173,7 +173,7 @@ function M.read(buf)
     return act(function(s)
       if s.unmanaged then
         if s.current then
-          api.nvim_feedkeys(":SessionSave ", "n", false)
+          api.nvim_feedkeys(":Session save ", "n", false)
         end
       elseif s.current then
         sessman.save(nil, { shada = shada })
@@ -196,8 +196,9 @@ function M.read(buf)
   map("S", save(true), "Save session with ShaDa")
   map("X", act(sessman.kill), "Kill session")
   map("D", act(sessman.delete), "Delete session")
-  vim.keymap.set("n", "co<Space>", ":Session ", { buffer = buf, desc = "Populate :Session" })
-  vim.keymap.set("n", "cs<Space>", ":SessionSave ", { buffer = buf, desc = "Populate :SessionSave" })
+  vim.keymap.set("n", "co<Space>", ":Session switch ", { buffer = buf, desc = "Populate :Session switch" })
+  vim.keymap.set("n", "cn<Space>", ":Session new ", { buffer = buf, desc = "Populate :Session new" })
+  vim.keymap.set("n", "cs<Space>", ":Session save ", { buffer = buf, desc = "Populate :Session save" })
   map(")", function()
     jump(vim.fn.sort(vim.tbl_keys(state[buf].entries), "n"), 1)
   end, "Next session")
