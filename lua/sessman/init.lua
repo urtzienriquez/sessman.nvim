@@ -314,7 +314,8 @@ end
 --- A plain nvim that would lose nothing by stopping: no unsaved changes and
 --- no terminal still running. It's stopped when we move away; sessions and
 --- anything else keep running.
-local function disposable()
+---@param ignore? table<integer, true> Terminal buffers not to count (a picker's)
+local function disposable(ignore)
   if vim.g.sessman_session or #api.nvim_list_uis() > 1 then
     return false
   end
@@ -322,7 +323,11 @@ local function disposable()
     if vim.bo[buf].modified then
       return false
     end
-    if vim.bo[buf].buftype == "terminal" and fn.jobwait({ vim.bo[buf].channel }, 0)[1] == -1 then
+    if
+      vim.bo[buf].buftype == "terminal"
+      and not (ignore and ignore[buf])
+      and fn.jobwait({ vim.bo[buf].channel }, 0)[1] == -1
+    then
       return false
     end
   end
@@ -405,18 +410,20 @@ end
 
 --- Go to a session: jump if running, restore if saved, create otherwise.
 ---@param s sessman.Session
-function M.open(s)
+---@param opts? { ignore?: table<integer, true> } Terminal buffers that don't keep this nvim alive
+function M.open(s, opts)
+  local ignore = opts and opts.ignore
   if s.current then
     return
   end
   if s.unmanaged then
-    return M.connect(s.sock, disposable())
+    return M.connect(s.sock, disposable(ignore))
   end
   if not s.name:match("^[^/%s]+$") then
     return err("invalid session name: " .. s.name)
   end
   if s.running or spawn(s) then
-    M.connect(s.sock, disposable())
+    M.connect(s.sock, disposable(ignore))
   end
 end
 
@@ -616,6 +623,23 @@ function M.pick()
   local items = vim.tbl_filter(function(s)
     return not s.unmanaged
   end, sessions)
+
+  -- Pickers like fzf-lua run in a terminal that is still alive when they
+  -- call back: it must not count as "a running terminal worth keeping".
+  local before = {}
+  for _, buf in ipairs(api.nvim_list_bufs()) do
+    before[buf] = vim.bo[buf].buftype == "terminal" or nil
+  end
+  local function picker_terminals()
+    local out = {}
+    for _, buf in ipairs(api.nvim_list_bufs()) do
+      if vim.bo[buf].buftype == "terminal" and not before[buf] then
+        out[buf] = true
+      end
+    end
+    return out
+  end
+
   vim.ui.select(items, {
     prompt = "Session ",
     format_item = function(s)
@@ -624,7 +648,10 @@ function M.pick()
     end,
   }, function(s)
     if s then
-      M.open(s)
+      local ignore = picker_terminals()
+      vim.schedule(function() -- let the picker close first
+        M.open(s, { ignore = ignore })
+      end)
     end
   end)
 end

@@ -79,6 +79,47 @@ describe("servers", function()
     assert.is_false(connects[1].stop)
   end)
 
+  describe("pick()", function()
+    local select = vim.ui.select
+    after_each(function()
+      vim.ui.select = select
+    end)
+
+    --- A picker that, like fzf-lua, runs in a terminal still alive when it
+    --- calls back.
+    local function terminal_picker(choice)
+      vim.ui.select = function(items, _, cb)
+        vim.cmd("terminal sleep 30")
+        for _, s in ipairs(items) do
+          if s.name == choice then
+            return cb(s)
+          end
+        end
+      end
+    end
+
+    it("doesn't let the picker's terminal keep the plain nvim alive", function()
+      env.write_session(env.project, "coding")
+      terminal_picker("coding")
+      sessman.pick()
+      assert.is_true(vim.wait(5000, function()
+        return #connects > 0
+      end, 10))
+      assert.is_true(connects[1].stop)
+    end)
+
+    it("still keeps it for a terminal that was open before", function()
+      env.write_session(env.project, "coding")
+      vim.cmd("terminal sleep 30")
+      terminal_picker("coding")
+      sessman.pick()
+      assert.is_true(vim.wait(5000, function()
+        return #connects > 0
+      end, 10))
+      assert.is_false(connects[1].stop)
+    end)
+  end)
+
   it("never stops a session it leaves", function()
     sessman.save("mine")
     sessman.go("fresh")
