@@ -154,6 +154,10 @@ No mappings are defined; for instance: >lua
 <
 Keep `require()` inside the function, as above, so sessman still loads only
 when the map is used.
+
+Sessions start without a UI; see |sessman-headless| for config (like ui2)
+that needs one.
+
 ==============================================================================
 LUA API                                                          *sessman-api*
 
@@ -172,6 +176,27 @@ require("sessman") ~
 
 *g:sessman_session* is `{ project = ..., name = ... }` inside a session, e.g.
 for a statusline.
+
+==============================================================================
+HEADLESS START                                              *sessman-headless*
+
+A session restored or created by `:Session` starts as a headless Nvim: your
+config runs before your terminal |:connect|s, so no UI is attached yet
+(`#vim.api.nvim_list_uis() == 0`). Config that needs a UI at startup won't
+see one. For example `require("vim._core.ui2").enable()` does nothing
+without a UI, and the command line falls back to the classic one.
+
+Run such config on |UIEnter| when Nvim starts without a UI: >lua
+
+    local function ui2() require("vim._core.ui2").enable({}) end
+    if #vim.api.nvim_list_uis() > 0 then
+      ui2()
+    else -- headless start, e.g. a sessman session: wait for the first UI
+      vim.api.nvim_create_autocmd("UIEnter", { once = true, callback = ui2 })
+    end
+<
+A plain `nvim` behaves as before. Sessions made with `:SessionSave {name}`
+from a plain nvim are not affected: that nvim started with a UI.
 
 ==============================================================================
 INTERNALS                                                  *sessman-internals*

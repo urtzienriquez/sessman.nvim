@@ -7,6 +7,7 @@ sessman-api	sessman.txt	/*sessman-api*
 sessman-buffer	sessman.txt	/*sessman-buffer*
 sessman-commands	sessman.txt	/*sessman-commands*
 sessman-config	sessman.txt	/*sessman-config*
+sessman-headless	sessman.txt	/*sessman-headless*
 sessman-internals	sessman.txt	/*sessman-internals*
 sessman-maps	sessman.txt	/*sessman-maps*
 sessman-targets	sessman.txt	/*sessman-targets*
