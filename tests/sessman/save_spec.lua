@@ -37,8 +37,8 @@ describe(":Session save", function()
     assert.are_not.same({ "original" }, vim.fn.readfile(sessman.new(env.project, "taken").file))
   end)
 
-  it("adopts into global/ and path targets", function()
-    sessman.save("global/notes")
+  it("adopts into global: and path targets", function()
+    sessman.save("global:notes")
     assert.is_false(sessman.current().project)
   end)
 

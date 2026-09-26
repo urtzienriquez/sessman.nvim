@@ -83,18 +83,27 @@ subcommand. `:S` is the short form, like fugitive's `:G`; it isn't defined if
 ==============================================================================
 TARGETS                                                      *sessman-targets*
 
-    name              a session of the project you are in, else a global one;
-                      new sessions go to the project you are in
-    global/name       a global session
-    project/name      a session of the project with that directory name
-    ~/path/name       a session of the project at that path
+A session is written `{project}:{name}`, like fugitive's `HEAD:file` or
+scp's `host:path`: the project comes before the colon, the session name after
+it. Session names can't contain ":", "/" or spaces.
 
+    name                a session of the project you are in, else a global
+                        one; new sessions go to the project you are in
+    global:name         a global session
+    project:name        a session of the project with that directory name
+    ~/path/to/dir:name  a session of the project at that path (also "./dir")
+>
+    :S new ~/papers/thesis:writing
+    :S switch thesis:writing
+    :S switch writing          " in thesis/, or global
+<
 The project you are in is the git root of the working directory, or the
-working directory itself outside a git repository.
+working directory itself outside a git repository. A path project is used as
+typed, not moved up to its git root.
 
 Completion offers the subcommands, then every session, fuzzily matched, so
 `:S switch <Tab>` works as a fuzzy session picker. For `:Session new` it
-completes directories: type the path, then `/name`.
+completes directories: type the path, then `:name`.
 
 ==============================================================================
 SESSION BUFFER                                                *sessman-buffer*

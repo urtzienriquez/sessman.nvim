@@ -8,7 +8,7 @@ One command, like fugitive's `:Git` (`:S` for short, like `:G`):
 
 - `:Session` — list every session, grouped by project (fugitive-style buffer, `g?` for maps)
 - `:Session switch coding` — jump to it if running, restore it if saved; `:Session switch -` goes back
-- `:Session new ~/papers/thesis/writing` — a new session in that project
+- `:Session new ~/papers/thesis:writing` — a new session `writing` in the project `~/papers/thesis` (`project:name`, like fugitive's `HEAD:file`)
 - `:Session save` — save the current session; `:Session save notes` turns a plain nvim into a session
 - `:Session kill [name]`, `:Session delete name` — stop a session / remove it
 

@@ -223,7 +223,7 @@ function M.project_label(project, sessions)
 end
 
 --- How a session is referred to in :Session: bare name for the here project,
---- global/name, project-basename/name, or ~/path/name when ambiguous.
+--- global:name, project-basename:name, or ~/path:name when ambiguous.
 ---@param s sessman.Session
 ---@param here string
 ---@param sessions sessman.Session[]
@@ -234,16 +234,17 @@ function M.label(s, here, sessions)
   elseif s.project == here then
     return s.name
   end
-  return M.project_label(s.project, sessions) .. "/" .. s.name
+  return M.project_label(s.project, sessions) .. ":" .. s.name
 end
 
---- Resolve a :Session target to a session (possibly one that doesn't exist yet).
+--- Resolve a :Session target, "name" or "project:name" (like fugitive's
+--- "object:path"), to a session, possibly one that doesn't exist yet.
 ---@param target string
 ---@param sessions sessman.Session[]
 ---@return sessman.Session?
 ---@return string? error
 function M.resolve(target, sessions)
-  local proj, name = target:match("^(.*)/([^/]+)$")
+  local proj, name = target:match("^(.*):([^:]+)$")
   local function find(project, n)
     for _, s in ipairs(sessions) do
       if not s.unmanaged and s.project == project and s.name == n then
@@ -253,12 +254,17 @@ function M.resolve(target, sessions)
   end
 
   if not proj then
+    if target:find("/") then
+      return nil, ("'%s': write {project}:{name}, e.g. ~/papers/thesis:writing"):format(target)
+    end
     local here = M.here()
     return find(here, target) or find(false, target) or M.new(here, target)
+  elseif proj == "" then
+    return nil, "missing project before ':' (global sessions: global:" .. name .. ")"
   elseif proj == "global" then
     return find(false, name) or M.new(false, name)
-  elseif proj == "" or proj:find("[/~.]") then
-    local path = abspath(proj == "" and "/" or proj)
+  elseif proj:find("/") or proj:find("^~") or proj == "." or proj == ".." then
+    local path = abspath(proj)
     if fn.isdirectory(path) == 0 then
       return nil, "not a directory: " .. path
     end
@@ -495,7 +501,7 @@ function M.open(s, opts)
   if s.unmanaged then
     return M.connect(s.sock, disposable(ignore))
   end
-  if not s.name:match("^[^/%s]+$") then
+  if not s.name:match("^[^/:%s]+$") then
     return err("invalid session name: " .. s.name)
   end
   if s.running or spawn(s) then
@@ -609,7 +615,7 @@ function M.save(name, opts)
     local target, msg = M.resolve(name, sessions)
     if not target then
       return err(msg)
-    elseif not target.name:match("^[^/%s]+$") then
+    elseif not target.name:match("^[^/:%s]+$") then
       return err("invalid session name: " .. target.name)
     elseif target.running then
       return err(target.name .. " is running; kill it first")
