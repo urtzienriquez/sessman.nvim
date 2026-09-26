@@ -30,8 +30,9 @@ No `setup()` needed. Optional:
 
 ```lua
 vim.g.sessman_dir = vim.fn.expand("~/sessions") -- default: stdpath("data") .. "/session"
-vim.keymap.set("n", "<leader>s", "<Cmd>Session<CR>")
-vim.keymap.set("n", "<leader>S", "<Cmd>Session -<CR>")
+vim.keymap.set("n", "<leader>ss", "<Cmd>Session<CR>", { desc = "Session list" })
+vim.keymap.set("n", "<leader>sp", "<Cmd>Session -<CR>", { desc = "Previous session" })
+vim.keymap.set("n", "<leader>sl", function() require("sessman").pick() end, { desc = "Pick a session" })
 ```
 
 ## Credits

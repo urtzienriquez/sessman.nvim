@@ -68,8 +68,8 @@ TARGETS                                                      *sessman-targets*
     project/name      a session of the project with that directory name
     ~/path/name       a session of the project at that path
 
-The project you are in is the deepest project with sessions that contains
-the working directory, else its git root, else the directory itself.
+The project you are in is the git root of the working directory, or the
+working directory itself outside a git repository.
 
 Completion lists every session, fuzzily matched, so `:Session <Tab>` works as
 a fuzzy session picker.
@@ -125,7 +125,8 @@ S           Save it and start or update its ShaDa file.
 X           Kill it: stop its server, keep its files. Killing the current
             session moves you to the previous one, or quits.
 D           Delete it: remove its files, and kill it if it runs.
-c<Space>    Start `:Session ` on the command line.
+co<Space>   Start `:Session ` on the command line.
+cs<Space>   Start `:SessionSave ` on the command line.
 )  (        Next/previous session.
 ]]  [[      Next/previous group.
 gq          Close the buffer.
@@ -144,9 +145,15 @@ Session files for a project live in a directory named after its path, with
 |:mksession| files, so 'sessionoptions' decides what they contain.
 
 No mappings are defined; for instance: >lua
-    vim.keymap.set("n", "<leader>s", "<Cmd>Session<CR>")
-    vim.keymap.set("n", "<leader>S", "<Cmd>Session -<CR>")
+    vim.keymap.set("n", "<leader>ss", "<Cmd>Session<CR>",
+      { desc = "Session list" })
+    vim.keymap.set("n", "<leader>sp", "<Cmd>Session -<CR>",
+      { desc = "Previous session" })
+    vim.keymap.set("n", "<leader>sl", function() require("sessman").pick() end,
+      { desc = "Pick a session" })
 <
+Keep `require()` inside the function, as above, so sessman still loads only
+when the map is used.
 ==============================================================================
 LUA API                                                          *sessman-api*
 

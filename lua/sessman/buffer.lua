@@ -44,7 +44,7 @@ end
 function M.render(buf)
   local sessman = require("sessman")
   local sessions = sessman.list()
-  local here = sessman.here(sessions)
+  local here = sessman.here()
 
   local cur
   local sections = {
@@ -196,7 +196,8 @@ function M.read(buf)
   map("S", save(true), "Save session with ShaDa")
   map("X", act(sessman.kill), "Kill session")
   map("D", act(sessman.delete), "Delete session")
-  vim.keymap.set("n", "c<Space>", ":Session ", { buffer = buf, desc = "Populate :Session" })
+  vim.keymap.set("n", "co<Space>", ":Session ", { buffer = buf, desc = "Populate :Session" })
+  vim.keymap.set("n", "cs<Space>", ":SessionSave ", { buffer = buf, desc = "Populate :SessionSave" })
   map(")", function()
     jump(vim.fn.sort(vim.tbl_keys(state[buf].entries), "n"), 1)
   end, "Next session")

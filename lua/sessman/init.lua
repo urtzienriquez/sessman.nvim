@@ -196,20 +196,11 @@ function M.list()
   return vim.list_extend(out, unmanaged(pids))
 end
 
---- The project the user is "in": the deepest known project containing cwd,
---- else the git root, else cwd.
----@param sessions? sessman.Session[]
+--- The project the user is "in": the git root, else the working directory.
 ---@return string
-function M.here(sessions)
+function M.here()
   local cwd = fs.normalize(fn.getcwd())
-  local best
-  for _, s in ipairs(sessions or M.list()) do
-    local p = not s.unmanaged and s.project
-    if p and (cwd == p or vim.startswith(cwd, p .. "/")) and (not best or #p > #best) then
-      best = p
-    end
-  end
-  return best or fs.normalize(fs.root(cwd, ".git") or cwd)
+  return fs.normalize(fs.root(cwd, ".git") or cwd)
 end
 
 --- Short name of a project: "global", its directory name, or ~/path when
@@ -262,7 +253,7 @@ function M.resolve(target, sessions)
   end
 
   if not proj then
-    local here = M.here(sessions)
+    local here = M.here()
     return find(here, target) or find(false, target) or M.new(here, target)
   elseif proj == "global" then
     return find(false, name) or M.new(false, name)
@@ -296,7 +287,7 @@ end
 ---@return string[]
 function M.complete(arglead)
   local sessions = M.list()
-  local here = M.here(sessions)
+  local here = M.here()
   local items = {}
   for _, s in ipairs(sessions) do
     if not s.unmanaged then
@@ -621,12 +612,12 @@ end
 --- Pick a session with vim.ui.select (and so with any picker that hooks it).
 function M.pick()
   local sessions = M.list()
-  local here = M.here(sessions)
+  local here = M.here()
   local items = vim.tbl_filter(function(s)
     return not s.unmanaged
   end, sessions)
   vim.ui.select(items, {
-    prompt = "Session",
+    prompt = "Session ",
     format_item = function(s)
       local label = M.label(s, here, sessions)
       return s.current and (label .. "  (current)") or s.running and (label .. "  (running)") or label

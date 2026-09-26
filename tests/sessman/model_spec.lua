@@ -79,14 +79,16 @@ describe("model", function()
   end)
 
   describe("here()", function()
-    it("is the deepest known project containing cwd", function()
-      env.write_session(env.project, "a")
+    it("is the git root, else cwd", function()
+      assert.equals(env.project, sessman.here())
       vim.fn.chdir(env.project .. "/sub")
+      assert.equals(env.project .. "/sub", sessman.here())
+      vim.fn.mkdir(env.project .. "/.git", "p")
       assert.equals(env.project, sessman.here())
     end)
 
-    it("falls back to the git root, then cwd", function()
-      assert.equals(env.project, sessman.here())
+    it("isn't captured by a project with sessions higher up", function()
+      env.write_session(env.root, "home") -- like a session saved in ~
       vim.fn.mkdir(env.project .. "/.git", "p")
       vim.fn.chdir(env.project .. "/sub")
       assert.equals(env.project, sessman.here())
@@ -134,7 +136,7 @@ describe("model", function()
 
     it("labels round-trip through resolve", function()
       local sessions = sessman.list()
-      local here = sessman.here(sessions)
+      local here = sessman.here()
       for _, s in ipairs(sessions) do
         if not s.unmanaged then
           local back = sessman.resolve(sessman.label(s, here, sessions), sessions)

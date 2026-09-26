@@ -210,6 +210,13 @@ describe("sessman://sessions", function()
     goto_entry("Saved", "coding")
   end)
 
+  it("co<Space> and cs<Space> start :Session and :SessionSave", function()
+    vim.cmd("Session")
+    assert.equals(":Session ", vim.fn.maparg("co<Space>", "n"))
+    assert.equals(":SessionSave ", vim.fn.maparg("cs<Space>", "n"))
+    assert.equals("", vim.fn.maparg("c<Space>", "n"))
+  end)
+
   it(":edit re-reads it", function()
     vim.cmd("Session")
     env.write_session(env.project, "later")
