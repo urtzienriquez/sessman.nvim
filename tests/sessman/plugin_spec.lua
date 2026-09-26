@@ -1,22 +1,22 @@
 local root = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h:h:h")
 
 describe("plugin/sessman.lua", function()
-  it("defines the commands on VimEnter and only loads once", function()
-    assert.is_nil(vim.g.loaded_sessman)
+  it("only defines commands and an autocmd, loading no module", function()
     vim.cmd.source(root .. "/plugin/sessman.lua")
     assert.equals(1, vim.g.loaded_sessman)
 
-    -- The VimEnter autocmd is registered from a vim.schedule callback
-    vim.wait(100, function()
-      return #vim.api.nvim_get_autocmds({ event = "VimEnter" }) > 0
-    end)
-    assert.is_nil(vim.api.nvim_get_commands({}).SessionLoad)
-    vim.api.nvim_exec_autocmds("VimEnter", {})
-    assert.is_not_nil(vim.api.nvim_get_commands({}).SessionLoad)
+    local cmds = vim.api.nvim_get_commands({})
+    assert.is_not_nil(cmds.Session)
+    assert.is_not_nil(cmds.SessionSave)
+    assert.equals(1, #vim.api.nvim_get_autocmds({ group = "sessman_buffer", event = "BufReadCmd" }))
 
-    -- A second source is a no-op (no second VimEnter handler)
+    for mod in pairs(package.loaded) do
+      assert.is_nil(mod:match("^sessman"), mod .. " loaded at startup")
+    end
+  end)
+
+  it("is idempotent", function()
     vim.cmd.source(root .. "/plugin/sessman.lua")
-    vim.wait(50)
-    assert.equals(0, #vim.api.nvim_get_autocmds({ event = "VimEnter" }))
+    assert.equals(1, #vim.api.nvim_get_autocmds({ group = "sessman_buffer", event = "BufReadCmd" }))
   end)
 end)
