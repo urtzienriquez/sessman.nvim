@@ -1,22 +1,15 @@
 # sessman.nvim
 
-Named Neovim sessions that keep **running** (survive closing the terminal) or
-stay **saved** (survive reboots) — tmux + tmux-resurrect, made of Nvim's own
-client/server parts.
+Named Neovim sessions that keep **running** (survive closing the terminal) or stay **saved** (survive reboots).
 
 **This is a project under development. Please, feel free to open issues or pull requests.**
 
-- `:Session` — list every session, grouped by project (fugitive-style buffer,
-  `g?` for maps)
-- `:Session coding` — jump to it if running, restore it if saved, create it
-  otherwise
+- `:Session` — list every session, grouped by project (fugitive-style buffer, `g?` for maps)
+- `:Session coding` — jump to it if running, restore it if saved, create it otherwise
 - `:Session -` — back to the previous session
-- `:SessionSave` — save the current session; `:SessionSave notes` turns a
-  plain nvim into a session
+- `:SessionSave` — save the current session; `:SessionSave notes` turns a plain nvim into a session
 
-A session belongs to a project (the git root, or a directory) or is global,
-and keeps its own working directory. Saving is always explicit. Nothing but
-two commands is loaded at startup. See `:help sessman`.
+A session belongs to a project (the git root, or a directory) or is global, and keeps its own working directory. Saving is always explicit. Nothing but two commands is loaded at startup. See `:help sessman`.
 
 Requires Neovim 0.12+ on a Unix-like system.
 
@@ -37,8 +30,7 @@ vim.keymap.set("n", "<leader>sl", function() require("sessman").pick() end, { de
 
 ## Credits
 
-The live-server half is adapted from
-[servery.nvim](https://github.com/wurli/servery.nvim) (MIT).
+The live-server half is adapted from [servery.nvim](https://github.com/wurli/servery.nvim) (MIT).
 
 ## License
 
