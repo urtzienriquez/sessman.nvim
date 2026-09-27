@@ -598,6 +598,74 @@ function M.attach()
   })
 end
 
+--- Buffers matching g:sessman_exclude: autocmd-style patterns, matched
+--- against the name's tail, or the full name when the pattern has a "/".
+---@return table<integer, true>
+local function excluded()
+  local out = {}
+  local patterns = {}
+  for _, p in ipairs(vim.g.sessman_exclude or {}) do
+    patterns[#patterns + 1] = { full = p:find("/") ~= nil, re = fn.glob2regpat(p) }
+  end
+  if #patterns == 0 then
+    return out
+  end
+  for _, buf in ipairs(api.nvim_list_bufs()) do
+    local name = api.nvim_buf_get_name(buf)
+    for _, p in ipairs(patterns) do
+      if name ~= "" and fn.match(p.full and name or fs.basename(name), p.re) ~= -1 then
+        out[buf] = true
+        break
+      end
+    end
+  end
+  return out
+end
+
+--- :mksession without the excluded buffers: they get no :badd, and their
+--- windows are recorded showing "sessman://excluded", which closes itself
+--- when the session is restored (see buffer.lua).
+---@param file string
+local function mksession(file)
+  local skip = excluded()
+  local placeholder, swapped, restore = nil, {}, {}
+  if next(skip) then
+    placeholder = api.nvim_create_buf(false, false)
+    api.nvim_buf_set_name(placeholder, "sessman://excluded")
+    for buf in pairs(skip) do
+      restore[buf] = { listed = vim.bo[buf].buflisted, hidden = vim.bo[buf].bufhidden }
+      vim.bo[buf].buflisted = false
+      vim.bo[buf].bufhidden = "hide" -- survive leaving its windows
+    end
+    for _, win in ipairs(api.nvim_list_wins()) do
+      local buf = api.nvim_win_get_buf(win)
+      if skip[buf] then
+        swapped[win] = buf
+        api.nvim_win_set_buf(win, placeholder)
+      end
+    end
+  end
+
+  local ok, e = pcall(vim.cmd, "mksession! " .. fn.fnameescape(file))
+
+  for win, buf in pairs(swapped) do
+    if api.nvim_win_is_valid(win) then
+      api.nvim_win_set_buf(win, buf)
+    end
+  end
+  for buf, o in pairs(restore) do
+    if api.nvim_buf_is_valid(buf) then
+      vim.bo[buf].buflisted, vim.bo[buf].bufhidden = o.listed, o.hidden
+    end
+  end
+  if placeholder then
+    pcall(api.nvim_buf_delete, placeholder, { force = true })
+  end
+  if not ok then
+    error(e, 0)
+  end
+end
+
 --- :Session save[!] [name]
 ---@param name? string Name for a plain nvim (adopts it as a session)
 ---@param opts? { bang?: boolean, shada?: boolean }
@@ -629,7 +697,7 @@ function M.save(name, opts)
 
   close_windows()
   fn.mkdir(fs.dirname(s.file), "p")
-  vim.cmd("mksession! " .. fn.fnameescape(s.file))
+  mksession(s.file)
 
   local shada_on = vim.o.shadafile ~= "" and abspath(vim.o.shadafile) == s.shada
   if opts.shada or shada_on or uv.fs_stat(s.shada) then

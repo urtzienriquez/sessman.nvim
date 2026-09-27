@@ -87,4 +87,69 @@ describe(":Session save", function()
     assert.is_nil(env.find_buf("sessman://sessions"))
     assert.is_nil(table.concat(vim.fn.readfile(sessman.current().file), "\n"):find("sessman://", 1, true))
   end)
+
+  describe("g:sessman_exclude", function()
+    after_each(function()
+      vim.g.sessman_exclude = nil
+    end)
+
+    --- Layout: a.txt | R-console / terminal running `sleep 30`
+    local function layout()
+      vim.cmd("runtime plugin/sessman.lua")
+      vim.cmd.edit(env.project .. "/a.txt")
+      vim.cmd("vsplit | enew | file R-console | split | terminal sleep 30")
+      local term = vim.api.nvim_get_current_buf()
+      return term, env.find_buf(env.project .. "/R-console")
+    end
+
+    local function names()
+      return vim.tbl_map(function(w)
+        return vim.fs.basename(vim.api.nvim_buf_get_name(vim.api.nvim_win_get_buf(w)))
+      end, vim.api.nvim_list_wins())
+    end
+
+    it("leaves matching buffers out of the file, and puts everything back", function()
+      vim.g.sessman_exclude = { "R-console", "term://*:sleep*" }
+      local term, rcons = layout()
+      vim.bo[rcons].buflisted = true
+      local before = names()
+      sessman.save("mine")
+
+      local file = table.concat(vim.fn.readfile(sessman.current().file), "\n")
+      assert.is_nil(file:find("R-console", 1, true))
+      assert.is_nil(file:find("term://", 1, true))
+      assert.matches("a%.txt", file)
+
+      assert.same(before, names())
+      assert.equals(-1, vim.fn.jobwait({ vim.bo[term].channel }, 0)[1], "terminal still runs")
+      assert.is_true(vim.bo[rcons].buflisted)
+      assert.is_nil(env.find_buf("sessman://excluded"))
+    end)
+
+    it("restores the layout without the excluded windows", function()
+      vim.g.sessman_exclude = { "R-console", "term://*:sleep*" }
+      layout()
+      sessman.save("mine")
+      local file = sessman.current().file
+
+      vim.cmd("silent! %bwipeout!")
+      vim.cmd("source " .. vim.fn.fnameescape(file))
+      vim.wait(200, function()
+        return #vim.api.nvim_list_wins() == 1
+      end)
+      assert.same({ "a.txt" }, names())
+      assert.is_nil(env.find_buf("sessman://excluded"))
+    end)
+
+    it("matches the tail, or the full name when the pattern has a /", function()
+      vim.g.sessman_exclude = { "*.log", env.project .. "/keep/*" }
+      vim.cmd.edit(env.project .. "/a.txt")
+      vim.cmd("badd " .. env.project .. "/x.log | badd " .. env.project .. "/keep/b.txt | badd " .. env.project .. "/c.txt")
+      sessman.save("mine")
+      local file = table.concat(vim.fn.readfile(sessman.current().file), "\n")
+      assert.is_nil(file:find("x.log", 1, true))
+      assert.is_nil(file:find("b.txt", 1, true))
+      assert.matches("c%.txt", file)
+    end)
+  end)
 end)

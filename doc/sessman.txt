@@ -183,6 +183,20 @@ Session files for a project live in a directory named after its path, with
 "/" replaced by "%"; global ones in "global/". Sessions are plain
 |:mksession| files, so 'sessionoptions' decides what they contain.
 
+*g:sessman_exclude*
+                Buffers never written into a session file: a list of
+                patterns, like |autocmd-pattern|s. A pattern without "/"
+                matches the end of the buffer name, otherwise the full name.
+                Default: none.
+>lua
+    vim.g.sessman_exclude = { "R-console", "term://*:julia*" }
+<
+Use it for consoles a plugin must start itself, like R.nvim's R console or a
+REPL: restored from a file, they would come back empty or not connected to
+their plugin. Excluded buffers are not touched while a session runs; only the
+file leaves them out. When the session is restored their windows are gone,
+and the plugin can open its own console (for R.nvim, see its `auto_start`).
+
 No mappings are defined; for instance: >lua
     vim.keymap.set("n", "<leader>ss", "<Cmd>Session<CR>",
       { desc = "Session list" })

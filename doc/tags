@@ -6,6 +6,7 @@
 :Session-save	sessman.txt	/*:Session-save*
 :Session-switch	sessman.txt	/*:Session-switch*
 g:sessman_dir	sessman.txt	/*g:sessman_dir*
+g:sessman_exclude	sessman.txt	/*g:sessman_exclude*
 g:sessman_session	sessman.txt	/*g:sessman_session*
 sessman	sessman.txt	/*sessman*
 sessman-api	sessman.txt	/*sessman-api*

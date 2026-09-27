@@ -26,6 +26,7 @@ No `setup()` needed. Optional:
 
 ```lua
 vim.g.sessman_dir = vim.fn.expand("~/sessions") -- default: stdpath("data") .. "/session"
+vim.g.sessman_exclude = { "R-console" } -- buffers never saved into session files (e.g. REPL consoles)
 vim.keymap.set("n", "<leader>ss", "<Cmd>Session<CR>", { desc = "Session list" })
 vim.keymap.set("n", "<leader>sp", "<Cmd>Session switch -<CR>", { desc = "Previous session" })
 vim.keymap.set("n", "<leader>sl", function() require("sessman").pick() end, { desc = "Pick a session" })

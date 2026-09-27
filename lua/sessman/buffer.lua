@@ -133,6 +133,25 @@ end
 --- BufReadCmd for sessman://sessions
 ---@param buf integer
 function M.read(buf)
+  if api.nvim_buf_get_name(buf) == "sessman://excluded" then
+    -- Stands in for a buffer left out of a session (g:sessman_exclude):
+    -- once the session is restored, its window goes away.
+    vim.bo[buf].buftype, vim.bo[buf].bufhidden, vim.bo[buf].buflisted = "nofile", "wipe", false
+    vim.schedule(function()
+      for _, win in ipairs(fn.win_findbuf(buf)) do
+        if #api.nvim_tabpage_list_wins(api.nvim_win_get_tabpage(win)) > 1 then
+          pcall(api.nvim_win_close, win, true)
+        else
+          api.nvim_win_call(win, function()
+            vim.cmd("enew")
+          end)
+        end
+      end
+      pcall(api.nvim_buf_delete, buf, { force = true })
+    end)
+    return
+  end
+
   local sessman = require("sessman")
   vim.bo[buf].buftype = "nofile"
   vim.bo[buf].bufhidden = "wipe"
