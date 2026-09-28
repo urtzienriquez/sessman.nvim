@@ -1,6 +1,6 @@
 # sessman.nvim
 
-Neovim [sessions](https://neovim.io/doc/user/starting.html#session-file) (`:mksession` files, which survive reboots) and the Nvim [servers](https://neovim.io/doc/user/remote.html) that have them (which survive closing the terminal): connect to a session's server, or load a session into a new one.
+sessman lets you move between Neovim [servers](https://neovim.io/doc/user/remote.html) and restore them from [session files](https://neovim.io/doc/user/starting.html#session-file). It names each session (a `:mksession` file) and connects you to the Nvim server that has it; when no server has it, for example after a reboot, it starts one from the session file.
 
 **This is a project under development. Please, feel free to open issues or pull requests.**
 

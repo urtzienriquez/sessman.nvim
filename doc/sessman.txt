@@ -6,24 +6,50 @@ License: GPL-3.0
 ==============================================================================
 INTRODUCTION                                                         *sessman*
 
-sessman uses two Nvim concepts, with their Nvim meaning:
+sessman combines two concepts that Nvim already provides:
 
-  session   a |session-file| written by |:mksession| (plus, optionally, its
-            own |shada| file). It survives reboots.
-  server    a running Nvim (|client-server|). Your terminal is a UI that
-            |:connect|s to it; the server survives closing the terminal,
-            keeping buffers, undo, |:terminal|s and jobs.
+  session   A |session-file| written by |:mksession|. It records the window
+            layout, tab pages, buffers and working directory, and can be
+            sourced later to restore them. Since it is a file, it persists
+            across reboots. A session can also have its own |shada| file.
 
-A server can have a session: the one it was loaded from and saves to (as
-|v:this_session|). sessman names sessions `project:name`: you |:connect| to
-the server that has one, or load a session into a new server. A server
-without a session is a plain nvim. Saving is always explicit. Think of tmux +
-tmux-resurrect, made of Nvim's own parts.
+  server    A running Nvim instance (|client-server|). The terminal only
+            hosts a UI attached to the server; the server keeps running when
+            the UI detaches or the terminal is closed, together with its
+            buffers, undo history, |:terminal|s and jobs. A UI can be moved
+            to another server with |:connect|.
 
-The project is only an anchor, fixed when the session is created: the root of
-the working directory (|g:sessman_root_markers|), or the directory itself.
-The working directory is ordinary session state, so a "manuscript" session
-can belong to a repo while working in its manuscript/ folder.
+A server can have a session: the one it was loaded from, and that it writes
+when saved (see |v:this_session|). sessman gives each session a name of the
+form `project:name` (see |sessman-targets|) and keeps track of which server,
+if any, has it. This makes two things possible:
+
+- Moving between servers. |:Session-connect| moves the UI to the server that
+  has a given session. The server that is left keeps running, so returning
+  to it is immediate and nothing needs to be restored.
+
+- Restoring from session files. When no server has a session, for instance
+  after a reboot, |:Session-load| starts a new server from its session file
+  and connects the UI to it.
+
+Session files are written only by |:Session-save|; sessman never saves
+automatically. |:Session-stop| stops a server and keeps its session file,
+and |:Session-delete| removes the session file. An Nvim started without a
+session is a plain server; |:Session-save| with a name gives it one.
+
+The resulting workflow is similar to tmux combined with tmux-resurrect, but
+it relies only on Nvim's own servers and session files.
+
+Each session belongs to a project, which is a directory, usually the root of
+a repository (|g:sessman_root_markers|), or to no project ("global"
+sessions). The project determines where the session file is stored and how
+the session is named. The working directory is independent of it and is saved
+as part of the session, so a session named "manuscript" can belong to a
+repository while its working directory is the repository's manuscript/
+folder.
+
+The command is called `:Session` because its argument is always a session
+name: a server is addressed through the session it has.
 
 Requires Nvim 0.12+ (|:connect|) on a Unix-like system. Nothing but the
 `:Session` and `:S` commands and an autocommand is defined at startup.
