@@ -222,6 +222,17 @@ describe("sessman://sessions", function()
     assert.equals("", vim.fn.maparg("c<Space>", "n"))
   end)
 
+  it("refreshes when the working directory changes", function()
+    vim.cmd.edit(env.project .. "/a.txt")
+    vim.cmd("Session")
+    vim.cmd("wincmd p")
+    vim.fn.mkdir(env.root .. "/elsewhere", "p")
+    vim.cmd.cd(env.root .. "/elsewhere")
+    local buf = env.find_buf("sessman://sessions")
+    local first = vim.api.nvim_buf_get_lines(buf, 1, 2, false)[1]
+    assert.equals("Project: " .. vim.fn.fnamemodify(env.root .. "/elsewhere", ":~"), first)
+  end)
+
   it(":edit re-reads it", function()
     vim.cmd("Session")
     env.write_session(env.project, "later")

@@ -166,6 +166,17 @@ function M.read(buf)
       M.render(buf)
     end,
   })
+  -- "Project:" (and "here" first) follow the working directory
+  api.nvim_create_autocmd("DirChanged", {
+    callback = function()
+      if not api.nvim_buf_is_valid(buf) then
+        return true -- the buffer is gone: remove this autocmd
+      end
+      if fn.bufwinid(buf) ~= -1 then
+        M.render(buf)
+      end
+    end,
+  })
 
   local function map(lhs, rhs, desc)
     vim.keymap.set("n", lhs, rhs, { buffer = buf, nowait = true, silent = true, desc = desc })
