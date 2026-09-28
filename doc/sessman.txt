@@ -115,18 +115,14 @@ SESSION BUFFER                                                *sessman-buffer*
     Help:    g?
 
     Running (4)
-      ~/Documents/thesis
-        coding      unsaved
-        manuscript  current, 2h ago
-      ~/Documents/GitHub/sessman.nvim
-        (unnamed)
-        coding      1h ago, in lua/
+      ~/Documents/thesis:coding               unsaved
+      ~/Documents/thesis:manuscript           current, 2h ago
+      ~/Documents/GitHub/sessman.nvim:(unnamed)
+      ~/Documents/GitHub/sessman.nvim:coding  1h ago, in lua/
 
     Saved (2)
-      ~/Documents/thesis
-        review      3d ago
-      global
-        notes       5d ago
+      ~/Documents/thesis:review  3d ago
+      global:notes               5d ago
 <
 Session:        the session you are in, or "(unnamed)".
 Project:        the project you are in: where new sessions go.
@@ -135,12 +131,12 @@ Running         nvims with a live server: going there is instant, and
 Saved           sessions that only exist as files: going there restores
                 them as they were at their last save.
 
-Inside a section, sessions are listed under their project's path (the
-project you are in first, "global" last), so equal names in different
-projects are told apart.
+Each session is written as in |sessman-targets|, `project:name` with the
+project's full path, so equal names in different projects are told apart.
+The project you are in comes first, "global" last.
 
 A "(unnamed)" nvim is one started with a plain `nvim`: running, but not a
-session. It's listed under the git root of its working directory (or the
+session. Its project is the git root of its working directory (or the
 directory itself). `:Session save {name}` (or `s` on the current one) makes it
 a session.
 

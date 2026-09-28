@@ -90,18 +90,14 @@ function M.render(buf)
       lines[#lines + 1] = ("%s (%d)"):format(section.title, #section.list)
       st.groups[#st.groups + 1] = #lines
 
-      -- A tree: each project's full path, its sessions indented below it
-      local width = 0
+      -- One line per session, written as in :Session: project:name
+      local labels, width = {}, 0
       for _, s in ipairs(section.list) do
-        width = math.max(width, fn.strdisplaywidth(name(s)))
+        labels[s] = (group[s] and fn.fnamemodify(group[s], ":~") or "global") .. ":" .. name(s)
+        width = math.max(width, fn.strdisplaywidth(labels[s]))
       end
-      local prev = {} -- no project yet
       for _, s in ipairs(section.list) do
-        if group[s] ~= prev then
-          prev = group[s]
-          lines[#lines + 1] = "  " .. (prev and fn.fnamemodify(prev, ":~") or "global")
-        end
-        lines[#lines + 1] = (("    " .. pad(name(s), width) .. "  " .. details(s)):gsub("%s+$", ""))
+        lines[#lines + 1] = (("  " .. pad(labels[s], width) .. "  " .. details(s)):gsub("%s+$", ""))
         st.entries[#lines] = s
       end
     end

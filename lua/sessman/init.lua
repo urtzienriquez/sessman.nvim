@@ -798,11 +798,9 @@ end
 
 --- Pick a session with vim.ui.select (and so with any picker that hooks it).
 function M.pick()
-  local sessions = M.list()
-  local here = M.here()
   local items = vim.tbl_filter(function(s)
     return not s.unmanaged
-  end, sessions)
+  end, M.list())
 
   -- Pickers like fzf-lua run in a terminal that is still alive when they
   -- call back: it must not count as "a running terminal worth keeping".
@@ -823,7 +821,8 @@ function M.pick()
   vim.ui.select(items, {
     prompt = "Session ",
     format_item = function(s)
-      local label = M.label(s, here, sessions)
+      -- Full project path: directory names can clash between projects
+      local label = (s.project and fn.fnamemodify(s.project, ":~") or "global") .. ":" .. s.name
       return s.current and (label .. "  (current)") or s.running and (label .. "  (running)") or label
     end,
   }, function(s)

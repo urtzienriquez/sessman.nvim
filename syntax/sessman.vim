@@ -6,8 +6,9 @@ syn match sessmanHeader  /^\%(Session\|Project\|Help\):/ nextgroup=sessmanValue 
 syn match sessmanValue   /.*/ contained
 syn match sessmanSection /^\%(Running\|Saved\)\ze (\d\+)$/ nextgroup=sessmanCount skipwhite
 syn match sessmanCount   /(\d\+)/ contained
-syn match sessmanProject /^  \S\+$/
-syn match sessmanUnnamed /^    \zs(unnamed)/
+" Entries: "  project:name  details"; the name has no ':', '/' or spaces
+syn match sessmanProject /^  \zs.\{-}\ze:[^:/ ]\+\%(  \|$\)/
+syn match sessmanUnnamed /:\zs(unnamed)\ze\%(  \|$\)/
 syn match sessmanDetail  /\s\{2}\zs\%(current\|unsaved\|\d\+[mhd] ago\|just now\).*$/ contains=sessmanCurrent,sessmanUnsaved
 syn match sessmanCurrent /\<current\>/ contained
 syn match sessmanUnsaved /\<unsaved\>/ contained

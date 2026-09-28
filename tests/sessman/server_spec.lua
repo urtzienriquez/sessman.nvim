@@ -85,6 +85,22 @@ describe("servers", function()
       vim.ui.select = select
     end)
 
+    it("labels sessions with their full project path", function()
+      env.write_session(env.project, "coding")
+      env.write_session(false, "notes")
+      sessman.create("fresh")
+      local labels
+      vim.ui.select = function(items, opts)
+        labels = vim.tbl_map(opts.format_item, items)
+      end
+      sessman.pick()
+      table.sort(labels)
+      local p = vim.fn.fnamemodify(env.project, ":~")
+      local expected = { "global:notes", p .. ":coding", p .. ":fresh  (running)" }
+      table.sort(expected)
+      assert.same(expected, labels)
+    end)
+
     --- A picker that, like fzf-lua, runs in a terminal still alive when it
     --- calls back.
     local function terminal_picker(choice)
