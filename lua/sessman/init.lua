@@ -809,7 +809,8 @@ end
 --- session moves this UI to the previous one, or quits.
 ---@param s sessman.Session
 ---@param force? boolean Skip the confirmation
-function M.kill(s, force)
+---@param list? boolean Killing the current session: open the list where we land
+function M.kill(s, force, list)
   if not s.running then
     return
   end
@@ -823,6 +824,9 @@ function M.kill(s, force)
     end
     local prev = M.previous()
     if prev then
+      if list then
+        remote(prev.sock, "require('sessman.buffer').open('')")
+      end
       M.connect(prev.sock, false)
     end
     vim.cmd("qall!")

@@ -282,6 +282,26 @@ describe("servers", function()
     assert.is_true(after.saved)
   end)
 
+  it("killing the current session from the list opens the list where it lands", function()
+    sessman.new("one")
+    sessman.new("two")
+    local one, two = get("one"), get("two")
+    -- Inside "two" (no UI there, so :connect is stubbed): kill itself
+    env.remote(two.sock, "(function() require('sessman').connect = function() end end)()")
+    pcall(env.remote, two.sock, [[(function()
+      local m = require('sessman')
+      for _, s in ipairs(m.list()) do
+        if s.current then m.kill(s, true, true) end
+      end
+    end)()]])
+    assert.is_true(vim.wait(2000, function()
+      return not vim.uv.fs_stat(two.sock)
+    end, 10), "two quit")
+    assert.is_true(vim.wait(2000, function()
+      return env.remote(one.sock, "vim.fn.bufexists('sessman://sessions')") == 1
+    end, 10), "the list is open in one")
+  end)
+
   it("deletes a running session: files removed and server stopped", function()
     env.write_session(env.project, "coding")
     sessman.switch("coding")
