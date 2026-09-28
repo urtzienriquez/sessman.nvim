@@ -1,4 +1,4 @@
---- The sessman://sessions buffer, in the spirit of fugitive's summary buffer.
+--- The :Session buffer, like fugitive's summary buffer.
 
 local M = {}
 
@@ -37,9 +37,8 @@ local function pad(text, width)
   return text .. (" "):rep(width - fn.strdisplaywidth(text))
 end
 
---- Sections by state, like fugitive's Untracked/Unstaged/Staged, one line
---- per session as project:name: the project you are in first, "global" last.
---- A plain nvim is a running nvim without a name: "(unnamed)".
+--- Running and Saved sections, one project:name line per session: the
+--- project you are in first, "global" last.
 ---@param buf integer
 function M.render(buf)
   local sessman = require("sessman")
@@ -94,7 +93,7 @@ function M.render(buf)
   end
 end
 
---- Jump to the next/previous line in `lnums` (sorted) from the cursor.
+--- Move to the next (dir 1) or previous (-1) of the sorted `lnums`.
 ---@param lnums integer[]
 ---@param dir 1|-1
 local function jump(lnums, dir)
@@ -106,12 +105,12 @@ local function jump(lnums, dir)
   end
 end
 
---- BufReadCmd for sessman://sessions
+--- BufReadCmd for sessman:// buffers.
 ---@param buf integer
 function M.read(buf)
   if api.nvim_buf_get_name(buf) == "sessman://excluded" then
-    -- Stands in for a buffer left out of a session (g:sessman_exclude):
-    -- once the session is restored, its window goes away.
+    -- Stands in for an excluded buffer (g:sessman_exclude): once the session
+    -- is restored, its window goes away
     vim.bo[buf].buftype, vim.bo[buf].bufhidden, vim.bo[buf].buflisted = "nofile", "wipe", false
     vim.schedule(function()
       for _, win in ipairs(fn.win_findbuf(buf)) do
@@ -142,11 +141,11 @@ function M.read(buf)
       M.render(buf)
     end,
   })
-  -- "Project:" (and "here" first) follow the working directory
+  -- "Project:" follows the working directory
   api.nvim_create_autocmd("DirChanged", {
     callback = function()
       if not api.nvim_buf_is_valid(buf) then
-        return true -- the buffer is gone: remove this autocmd
+        return true -- deletes this autocmd
       end
       if fn.bufwinid(buf) ~= -1 then
         M.render(buf)
@@ -158,7 +157,7 @@ function M.read(buf)
     vim.keymap.set("n", lhs, rhs, { buffer = buf, nowait = true, silent = true, desc = desc })
   end
 
-  --- Wrap an action on the session under the cursor, then refresh.
+  --- An action on the entry under the cursor, then a refresh.
   local function act(f)
     return function()
       local s = state[buf] and state[buf].entries[fn.line(".")]
@@ -175,15 +174,15 @@ function M.read(buf)
     return act(function(s)
       local running = s.running and not s.unmanaged
       if running and s.saved and fn.confirm("Overwrite the saved session " .. s.name .. "?", "&Yes\n&No", 2) ~= 1 then
-        return -- a key pressed by mistake shouldn't replace a saved session
+        return
       end
       if s.current and s.unmanaged then
-        -- Fill in the command, for the name: it shows how it's done
+        -- Fill in the command for the name: it teaches the command
         api.nvim_feedkeys(shada and ":Session save ++shada " or ":Session save ", "ni", false)
       elseif s.current then
         sessman.save(nil, { shada = shada })
         if not api.nvim_buf_is_valid(buf) then
-          M.open("") -- :mksession needed its window closed
+          M.open("") -- save() closed it
         end
       elseif not running then
         local why = s.unmanaged and "not a session: go there (<CR>) and :Session save {name}"
@@ -204,7 +203,7 @@ function M.read(buf)
   map("s", save(false), "Save session")
   map("S", save(true), "Save session with ShaDa")
   map("X", act(function(s)
-    sessman.kill(s, false, true) -- the list stays open, also if we move away
+    sessman.kill(s, false, true) -- reopen the list where we land
   end), "Kill session")
   map("D", act(sessman.delete), "Delete session")
   vim.keymap.set("n", "co<Space>", ":Session switch ", { buffer = buf, desc = "Populate :Session switch" })
@@ -235,8 +234,7 @@ function M.read(buf)
   })
 end
 
---- Like fugitive's :Git: without a position modifier, split at the edge of
---- the screen, spanning its full width (or height, with :vertical).
+--- Without a position modifier, split at the screen's edge, like :Git.
 ---@param mods string
 ---@return string
 local function edge(mods)
@@ -252,15 +250,14 @@ local function edge(mods)
   return (after and "botright " or "topleft ") .. mods
 end
 
---- :Session without arguments: focus the buffer if it's visible, else open
---- it in a split at the top (honouring <mods>).
+--- Focus the list if visible, else open it (honouring <mods>).
 ---@param mods string
 function M.open(mods)
   for _, buf in ipairs(api.nvim_list_bufs()) do
     if api.nvim_buf_get_name(buf) == M.name then
       local win = fn.bufwinid(buf)
       if vim.bo[buf].filetype ~= "sessman" then
-        -- An empty stand-in, e.g. restored by a session file: replace it
+        -- An empty stand-in restored by an old session file
         api.nvim_buf_delete(buf, { force = true })
       elseif win ~= -1 then
         api.nvim_set_current_win(win)

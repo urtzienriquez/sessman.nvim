@@ -1,50 +1,56 @@
---- sessman.nvim: named sessions that are either running (an Nvim server you
---- :connect to) or saved (a :mksession file), anchored to a project directory.
----
---- The server half (spawn a headless server, wait for its socket, :connect)
---- is adapted from servery.nvim (https://github.com/wurli/servery.nvim, MIT,
---- (c) servery.nvim authors).
+--- Named sessions, either running (an Nvim server you :connect to) or saved
+--- (a :mksession file), anchored to a project directory.
+--- The server half is adapted from servery.nvim (MIT, (c) servery.nvim authors).
 
 local M = {}
 
 local api, fn, fs, uv = vim.api, vim.fn, vim.fs, vim.uv
 
 ---@class sessman.Session
----@field project string|false Anchor directory, false for global sessions
+---@field project string|false Directory, false for global sessions
 ---@field name string
----@field file string Saved session file
----@field shada string Per-session ShaDa file (optional)
----@field sock string Socket the server listens on while running
+---@field file string
+---@field shada string
+---@field sock string
 ---@field saved? boolean
 ---@field running? boolean
 ---@field current? boolean
 ---@field mtime? integer
 ---@field cwd? string
----@field active? integer Last time a UI left it (os.time())
----@field unmanaged? boolean A plain nvim that is not a sessman session
+---@field active? integer When a UI last left it
+---@field unmanaged? boolean A plain nvim, not a session
 ---@field pid? integer
 
 local function err(msg)
   api.nvim_echo({ { "sessman: " .. msg, "ErrorMsg" } }, true, {})
 end
 
----@return string
+local function yes(question)
+  return fn.confirm(question, "&Yes\n&No", 2) == 1
+end
+
+local function valid(name)
+  return name:match("^[^/:%s]+$") ~= nil
+end
+
 local function dir()
   return fs.normalize(vim.g.sessman_dir or (fn.stdpath("data") .. "/session"))
 end
 
----@return string
 local function rundir()
   return fs.joinpath(fn.stdpath("run") --[[@as string]], "sessman")
 end
 
----@param path string
----@return string
 local function abspath(path)
   return fs.normalize(fn.fnamemodify(fn.expand(path), ":p"))
 end
 
---- Session directories are named after the project path with "/" -> "%".
+--- The git root of a directory, else the directory.
+local function root(path)
+  return fs.root(path, ".git") or path
+end
+
+-- Session directories: the project path with "/" -> "%", or "global"
 local function encode(project)
   return project and (project:gsub("/", "%%")) or "global"
 end
@@ -62,24 +68,22 @@ end
 ---@return sessman.Session
 function M.session(project, name)
   local base = fs.joinpath(dir(), encode(project), name)
-  local id = fn.sha256((project or "") .. "\0" .. name):sub(1, 12)
   return {
     project = project,
     name = name,
     file = base .. ".vim",
     shada = base .. ".shada",
-    sock = fs.joinpath(rundir(), id),
+    -- Short: socket paths are length limited
+    sock = fs.joinpath(rundir(), fn.sha256((project or "") .. "\0" .. name):sub(1, 12)),
   }
 end
 
---- The session this instance is, or nil for a plain nvim.
----@return sessman.Session?
+---@return sessman.Session? nil in a plain nvim
 function M.current()
   local id = vim.g.sessman_session
   return id and M.session(id.project, id.name) or nil
 end
 
----@param addr string
 local function alive(addr)
   if vim.tbl_contains(fn.serverlist(), addr) then
     return true
@@ -92,7 +96,7 @@ local function alive(addr)
   return false
 end
 
---- Plain nvim instances (not sessman sessions), deduplicated by pid.
+--- Plain nvim instances, one per pid.
 ---@param managed_pids table<integer, true>
 ---@return sessman.Session[]
 local function unmanaged(managed_pids)
@@ -110,9 +114,7 @@ local function unmanaged(managed_pids)
       out[#out + 1] = {
         unmanaged = true,
         name = current and fn.getcwd() or uv.fs_readlink("/proc/" .. pid .. "/cwd") or ("pid " .. pid),
-        project = false,
         sock = addr,
-        pid = pid,
         running = true,
         current = current and not vim.g.sessman_session or nil,
       }
@@ -121,9 +123,8 @@ local function unmanaged(managed_pids)
   return out
 end
 
---- Every known session: saved ones from the session directory, running ones
---- from the status files next to their sockets, and plain nvim instances.
---- Never blocks on a busy server.
+--- Saved sessions (session dir), running ones (status files beside their
+--- sockets) and plain nvims. Never blocks on a busy server.
 ---@return sessman.Session[]
 function M.list()
   local by_key, out = {}, {}
@@ -136,32 +137,30 @@ function M.list()
     return by_key[key]
   end
 
-  local root = dir()
-  for dirname, type in fs.dir(root) do
+  for dirname, type in fs.dir(dir()) do
     local project = type == "directory" and decode(dirname)
     if project ~= nil then
-      for file, ftype in fs.dir(fs.joinpath(root, dirname)) do
+      for file, ftype in fs.dir(fs.joinpath(dir(), dirname)) do
         if ftype == "file" and file:sub(-4) == ".vim" then
           local s = get(project, file:sub(1, -5))
-          s.saved = true
           local stat = uv.fs_stat(s.file)
-          s.mtime = stat and stat.mtime.sec
+          s.saved, s.mtime = true, stat and stat.mtime.sec
         end
       end
     end
   end
 
-  local run, pids = rundir(), {}
-  for file in fs.dir(run) do
+  local pids = {}
+  for file in fs.dir(rundir()) do
     if file:sub(-5) == ".json" then
-      local path = fs.joinpath(run, file)
-      local ok, st = pcall(vim.json.decode, table.concat(fn.readfile(path)))
+      local path = fs.joinpath(rundir(), file)
       local sock = path:sub(1, -6)
+      local ok, st = pcall(vim.json.decode, table.concat(fn.readfile(path)))
       if ok and type(st) == "table" and st.name and alive(sock) then
         local s = get(st.project, st.name)
         s.running, s.cwd, s.active, s.pid = true, st.cwd, st.active, st.pid
         pids[st.pid] = true
-      else
+      else -- stale
         os.remove(path)
         os.remove(sock)
       end
@@ -173,45 +172,36 @@ function M.list()
     s.current = cur and s.project == cur.project and s.name == cur.name or nil
   end
   if cur and not by_key[(cur.project or "") .. "\0" .. cur.name] then
-    -- Current session not (yet) visible on disk, e.g. mid-adoption
+    -- Not on disk yet, e.g. while being adopted
     local s = get(cur.project, cur.name)
     s.current, s.running = true, true
   end
   return vim.list_extend(out, unmanaged(pids))
 end
 
---- The project the user is "in": the git root, else the working directory.
+--- The project you are in.
 ---@return string
 function M.here()
-  local cwd = fs.normalize(fn.getcwd())
-  return fs.normalize(fs.root(cwd, ".git") or cwd)
+  return root(fs.normalize(fn.getcwd()))
 end
 
---- The project an entry is listed under: a session's own, or for a plain
---- nvim the git root of its working directory (or the directory itself).
----@param s sessman.Session
+--- The project an entry is listed under (a plain nvim's is its directory's).
 ---@return string|false
 function M.project_of(s)
   if not s.unmanaged then
     return s.project
   end
-  local dir = s.name:sub(1, 1) == "/" and s.name
-  return dir and fs.normalize(fs.root(dir, ".git") or dir) or s.name
+  return s.name:sub(1, 1) == "/" and root(s.name) or s.name
 end
 
---- How the list and the picker show an entry: ~/full/path:name
----@param s sessman.Session
+--- ~/full/path:name, as the list and the picker show it.
 ---@return string
 function M.display(s)
   local project = M.project_of(s)
   return (project and fn.fnamemodify(project, ":~") or "global") .. ":" .. (s.unmanaged and "(unnamed)" or s.name)
 end
 
---- Short name of a project: "global", its directory name, or ~/path when
---- another project has the same directory name.
----@param project string|false
----@param sessions sessman.Session[]
----@return string
+--- "global", the directory name, or ~/path when directory names clash.
 local function project_label(project, sessions)
   if not project then
     return "global"
@@ -226,20 +216,13 @@ local function project_label(project, sessions)
   return (base and base ~= "global") and base or fn.fnamemodify(project, ":~")
 end
 
---- How a session is referred to in :Session: bare name for the here project,
---- global:name, project-basename:name, or ~/path:name when ambiguous.
----@param s sessman.Session
----@param here string
----@param sessions sessman.Session[]
----@return string
+--- The shortest :Session target for s: its name in the project you are in,
+--- else project:name.
 function M.label(s, here, sessions)
   return s.project == here and s.name or (project_label(s.project, sessions) .. ":" .. s.name)
 end
 
---- Resolve a :Session target, "name" or "project:name" (like fugitive's
---- "object:path"), to a session, possibly one that doesn't exist yet.
----@param target string
----@param sessions sessman.Session[]
+--- Resolve "name" or "project:name" to a session, possibly a new one.
 ---@return sessman.Session?
 ---@return string? error
 function M.resolve(target, sessions)
@@ -270,6 +253,7 @@ function M.resolve(target, sessions)
     return find(path, name) or M.session(path, name)
   end
 
+  -- A directory name: a project that has sessions, else a relative path
   local matches = {}
   for _, s in ipairs(sessions) do
     if s.project and not s.unmanaged and fs.basename(s.project) == proj then
@@ -289,22 +273,18 @@ end
 
 local subcommands = { "switch", "new", "save", "kill", "delete" }
 
----@param items string[]
----@param arglead string
 local function filter(items, arglead)
   return arglead == "" and items or fn.matchfuzzy(items, arglead)
 end
 
---- :Session completion: subcommands, then sessions (fuzzy), or directories
---- for :Session new.
 ---@param arglead string
 ---@param cmdline? string
 ---@return string[]
 function M.complete(arglead, cmdline)
-  -- Arguments after the command name (:Session or :S; modifiers are lowercase)
+  -- Arguments after :Session or :S (modifiers are lowercase)
   local args = (cmdline or ""):match("%f[%w]S%w*!?%s+(.*)$") or ""
   local words = vim.tbl_filter(function(w)
-    return w ~= "++shada" -- an option, not a positional argument
+    return w ~= "++shada"
   end, vim.split(args, "%s+", { trimempty = true }))
   local position = #words + (arglead == "" and 1 or 0)
   if position <= 1 then
@@ -315,7 +295,7 @@ function M.complete(arglead, cmdline)
     return fn.getcompletion(arglead, "dir")
   end
 
-  -- Only sessions the subcommand can act on
+  -- Only what the subcommand can act on
   local wanted = ({
     kill = function(s)
       return s.running
@@ -347,10 +327,8 @@ function M.complete(arglead, cmdline)
   return filter(items, arglead)
 end
 
---- The :Session command.
----@param o table Arguments of nvim_create_user_command's callback
+--- :Session and :S
 function M.command(o)
-  -- ++shada (like :write ++enc): save with the session's own ShaDa
   local shada = false
   local args = vim.tbl_filter(function(a)
     shada = shada or a == "++shada"
@@ -375,7 +353,7 @@ function M.command(o)
     local s, msg = M.resolve(t, M.list())
     if not s then
       err(msg)
-    elseif not (s.running or s.saved or s.unmanaged) then
+    elseif not (s.running or s.saved) then
       err("no session " .. t)
       s = nil
     end
@@ -383,21 +361,20 @@ function M.command(o)
   end
 
   if sub == "switch" then
-    return M.switch(target) -- no target: pick one
+    return M.switch(target)
   elseif sub == "new" then
     return need_target() and M.new(target)
   elseif sub == "save" then
     return M.save(target, { bang = o.bang, shada = shada })
   elseif sub == "kill" then
-    if not target then
-      for _, s in ipairs(M.list()) do
-        if s.current then
-          return M.kill(s)
-        end
-      end
-      return
+    local s
+    if target then
+      s = find(target)
+    else
+      s = vim.iter(M.list()):find(function(x)
+        return x.current
+      end)
     end
-    local s = find(target)
     return s and M.kill(s)
   elseif sub == "delete" then
     local s = need_target() and find(target)
@@ -407,7 +384,6 @@ function M.command(o)
 end
 
 --- The running session left most recently, other than this one.
----@param sessions? sessman.Session[]
 ---@return sessman.Session?
 function M.previous(sessions)
   local best
@@ -419,10 +395,8 @@ function M.previous(sessions)
   return best
 end
 
---- A plain nvim that would lose nothing by stopping: no unsaved changes and
---- no terminal still running. It's stopped when we move away; sessions and
---- anything else keep running.
----@param ignore? table<integer, true> Terminal buffers not to count (a picker's)
+--- Whether this plain nvim loses nothing if stopped when we leave it: no
+--- unsaved changes, no running terminal (except `ignore`d ones, a picker's).
 local function disposable(ignore)
   if vim.g.sessman_session or #api.nvim_list_uis() > 1 then
     return false
@@ -442,9 +416,8 @@ local function disposable(ignore)
   return true
 end
 
---- Get rid of sessman's own buffers: they'd be left behind in the old server,
---- and :mksession would record them as empty buffers. A window that is the
---- last in its tab shows the alternate buffer (or a new one) instead.
+--- Remove sessman's buffers: they'd stay behind in the server we leave, and
+--- :mksession would record them. A tab's last window gets another buffer.
 local function close_windows()
   local function ours(buf)
     return api.nvim_buf_get_name(buf):match("^sessman://") ~= nil
@@ -468,26 +441,24 @@ local function close_windows()
   end
 end
 
---- Move this UI to another server. Replaced in tests.
----@param addr string
----@param stop boolean Stop the server we leave (:connect!)
+--- Move this UI to another server (:connect! stops the one we leave).
+--- Replaced in tests.
 function M.connect(addr, stop)
   close_windows()
   vim.cmd.connect({ args = { addr }, bang = stop })
 end
 
----@param s sessman.Session
 ---@return boolean ok
 local function spawn(s)
   fn.mkdir(rundir(), "p")
-  os.remove(s.sock) -- a stale one, if list() found it dead
+  os.remove(s.sock) -- stale, if any
 
   local ident = ("lua vim.g.sessman_session={project=%s,name=%q}"):format(
     s.project and ("%q"):format(s.project) or "false",
     s.name
   )
-  -- Session files size windows relative to &columns/&lines: source them at
-  -- the size of the UI that will attach, not the headless 80x24.
+  -- Session files size windows relative to the screen: use the UI's size,
+  -- not the headless 80x24
   local size = ("set columns=%d lines=%d"):format(vim.o.columns, vim.o.lines)
   local cmd = { vim.v.progpath, "--headless", "--listen", s.sock, "--cmd", ident, "--cmd", size }
   if s.saved then
@@ -503,7 +474,7 @@ local function spawn(s)
     cwd = fn.isdirectory(s.project) == 1 and s.project or cwd
   end
 
-  -- The status file is written by attach(), after the session is sourced
+  -- Ready once attach() wrote the status file, after sourcing the session
   local job = fn.jobstart(cmd, { detach = true, cwd = cwd, stdin = "null" })
   if job <= 0 or not vim.wait(5000, function()
     return uv.fs_stat(s.sock .. ".json") ~= nil
@@ -514,18 +485,13 @@ local function spawn(s)
   return true
 end
 
---- Go to a session: jump if running, restore if saved, create otherwise.
----@param s sessman.Session
----@param opts? { ignore?: table<integer, true> } Terminal buffers that don't keep this nvim alive
+--- Go to s: jump if running, restore if saved, create otherwise.
+---@param opts? { ignore?: table<integer, true> } See disposable()
 function M.open(s, opts)
   local ignore = opts and opts.ignore
   if s.current then
     return
-  end
-  if s.unmanaged then
-    return M.connect(s.sock, disposable(ignore))
-  end
-  if not s.name:match("^[^/:%s]+$") then
+  elseif not s.unmanaged and not valid(s.name) then
     return err("invalid session name: " .. s.name)
   end
   if s.running or spawn(s) then
@@ -533,9 +499,8 @@ function M.open(s, opts)
   end
 end
 
---- Pick a session, or plain nvim, with vim.ui.select (and so any picker
---- that hooks it) and go there.
----@param running? boolean true: the running ones but this one; false: the not running ones
+--- vim.ui.select a session or plain nvim and go there, most recent first.
+---@param running? boolean true: the running ones but this one; false: the others
 local function pick(running)
   local items = vim.tbl_filter(function(s)
     if running == nil then
@@ -543,13 +508,13 @@ local function pick(running)
     end
     return running and (s.running and not s.current) or (not running and not s.running)
   end, M.list())
-  local what = running == nil and "session" or running and "other running session" or "saved session not running"
   if #items == 0 then
+    local what = running == nil and "session" or running and "other running session" or "saved session not running"
     return err("no " .. what)
   end
 
-  -- Most recent first: running sessions by when they were left (the first is
-  -- where `switch -` goes), plain nvims, saved ones by last save; this one last
+  -- Running sessions by when they were left (the first is `switch -`'s),
+  -- plain nvims, saved ones by last save; this one last
   local function key(s)
     return {
       s.current and 1 or 0,
@@ -568,8 +533,8 @@ local function pick(running)
     return false
   end)
 
-  -- Pickers like fzf-lua run in a terminal that is still alive when they
-  -- call back: it must not count as "a running terminal worth keeping".
+  -- A picker's own terminal (fzf-lua) is still running when it calls back:
+  -- it mustn't keep this nvim alive
   local before = {}
   for _, buf in ipairs(api.nvim_list_bufs()) do
     before[buf] = vim.bo[buf].buftype == "terminal" or nil
@@ -589,15 +554,14 @@ local function pick(running)
     for _, buf in ipairs(api.nvim_list_bufs()) do
       ignore[buf] = vim.bo[buf].buftype == "terminal" and not before[buf] or nil
     end
-    vim.schedule(function() -- let the picker close first
+    vim.schedule(function() -- after the picker closed
       M.open(s, { ignore = ignore })
     end)
   end)
 end
 
---- :Session switch {target}: jump to a running session or restore a saved
---- one; "-" is the previous session. Without a target, pick one;
---- `switch({ running = true })` picks among the running ones.
+--- Go to a running or saved session ("-": the previous one). Without a
+--- target, pick one; { running = true/false } narrows the picker.
 ---@param target? string|{ running?: boolean }
 function M.switch(target)
   if type(target) ~= "string" then
@@ -612,14 +576,13 @@ function M.switch(target)
   end
   if not s then
     return err(msg)
-  elseif not (s.running or s.saved or s.unmanaged) then
+  elseif not (s.running or s.saved) then
     return err(("no session %s; to create it: :Session new %s"):format(target, target))
   end
   M.open(s)
 end
 
---- :Session new {target}: create a fresh session and switch to it.
----@param target string
+--- Create a session and go there.
 function M.new(target)
   local s, msg = M.resolve(target, M.list())
   if not s then
@@ -630,8 +593,7 @@ function M.new(target)
   M.open(s)
 end
 
---- Run inside a session's server: listen on its socket and keep its status
---- file up to date. Called by spawned servers and when adopting.
+--- In a session's server: listen on its socket and keep its status file.
 function M.attach()
   local s = M.current()
   if not s then
@@ -646,21 +608,14 @@ function M.attach()
   local function write()
     local f = io.open(status, "w")
     if f then
-      f:write(vim.json.encode({
-        project = s.project,
-        name = s.name,
-        cwd = fn.getcwd(),
-        pid = fn.getpid(),
-        active = active,
-      }))
+      f:write(vim.json.encode({ project = s.project, name = s.name, cwd = fn.getcwd(), pid = fn.getpid(), active = active }))
       f:close()
     end
   end
   write()
 
-  -- An adopted session is a plain nvim, which exits with its terminal unless
-  -- its UIs are detachable (:detach!, Nvim 0.13+). Spawned headless servers
-  -- survive anyway.
+  -- A plain nvim made a session exits with its terminal unless its UIs are
+  -- detachable (Nvim 0.13+); spawned servers survive anyway
   local function detachable()
     if #api.nvim_list_uis() > 0 then
       pcall(vim.cmd, "silent detach!")
@@ -688,12 +643,10 @@ function M.attach()
   })
 end
 
---- Buffers matching g:sessman_exclude: autocmd-style patterns, matched
---- against the name's tail, or the full name when the pattern has a "/".
----@return table<integer, true>
+--- Buffers matching g:sessman_exclude (autocmd-style patterns, on the name's
+--- tail, or the full name if the pattern has a "/").
 local function excluded()
-  local out = {}
-  local patterns = {}
+  local out, patterns = {}, {}
   for _, p in ipairs(vim.g.sessman_exclude or {}) do
     patterns[#patterns + 1] = { full = p:find("/") ~= nil, re = fn.glob2regpat(p) }
   end
@@ -712,10 +665,8 @@ local function excluded()
   return out
 end
 
---- :mksession without the excluded buffers: they get no :badd, and their
---- windows are recorded showing "sessman://excluded", which closes itself
---- when the session is restored (see buffer.lua).
----@param file string
+--- :mksession without the excluded buffers: no :badd, and their windows show
+--- "sessman://excluded", which closes itself on restore (buffer.lua).
 local function mksession(file)
   local skip = excluded()
   local placeholder, swapped, restore = nil, {}, {}
@@ -724,8 +675,7 @@ local function mksession(file)
     api.nvim_buf_set_name(placeholder, "sessman://excluded")
     for buf in pairs(skip) do
       restore[buf] = { listed = vim.bo[buf].buflisted, hidden = vim.bo[buf].bufhidden }
-      vim.bo[buf].buflisted = false
-      vim.bo[buf].bufhidden = "hide" -- survive leaving its windows
+      vim.bo[buf].buflisted, vim.bo[buf].bufhidden = false, "hide"
     end
     for _, win in ipairs(api.nvim_list_wins()) do
       local buf = api.nvim_win_get_buf(win)
@@ -756,24 +706,27 @@ local function mksession(file)
   end
 end
 
---- :Session save[!] [name]
----@param name? string Name for a plain nvim (adopts it as a session)
+--- Save the current session; in a plain nvim, `name` makes it a session.
+---@param name? string
 ---@param opts? { bang?: boolean, shada?: boolean }
 function M.save(name, opts)
   opts = opts or {}
   local s = M.current()
 
   if s and name and name ~= s.name then
-    return err("this is session " .. s.name .. "; session names can't change")
+    -- It may still be this session's name, written as project:name
+    local target = M.resolve(name, M.list())
+    if not (target and target.project == s.project and target.name == s.name) then
+      return err("this is session " .. s.name .. "; session names can't change")
+    end
   elseif not s then
     if not name then
       return err("argument required: a name for this session")
     end
-    local sessions = M.list()
-    local target, msg = M.resolve(name, sessions)
+    local target, msg = M.resolve(name, M.list())
     if not target then
       return err(msg)
-    elseif not target.name:match("^[^/:%s]+$") then
+    elseif not valid(target.name) then
       return err("invalid session name: " .. target.name)
     elseif target.running then
       return err(target.name .. " is running; kill it first")
@@ -789,8 +742,10 @@ function M.save(name, opts)
   fn.mkdir(fs.dirname(s.file), "p")
   mksession(s.file)
 
-  local shada_on = vim.o.shadafile ~= "" and abspath(vim.o.shadafile) == s.shada
-  local shada = opts.shada or shada_on or uv.fs_stat(s.shada) ~= nil
+  -- Asked for, or already the session's: keep its ShaDa up to date
+  local shada = opts.shada
+    or (vim.o.shadafile ~= "" and abspath(vim.o.shadafile) == s.shada)
+    or uv.fs_stat(s.shada) ~= nil
   if shada then
     vim.cmd("wshada! " .. fn.fnameescape(s.shada))
     vim.o.shadafile = s.shada
@@ -798,9 +753,7 @@ function M.save(name, opts)
   api.nvim_echo({ { "Saved session " .. s.name .. (shada and " with its ShaDa" or "") } }, false, {})
 end
 
---- Run a Lua chunk in another server without waiting for it to finish.
----@param addr string
----@param code string
+--- Run Lua in another server, without waiting for it.
 local function remote(addr, code)
   local ok, chan = pcall(fn.sockconnect, "pipe", addr, { rpc = true })
   if not ok or chan <= 0 then
@@ -811,18 +764,16 @@ local function remote(addr, code)
   return true
 end
 
---- Ask a running session to save itself.
----@param s sessman.Session
+--- Ask another running session to save itself.
 ---@param opts? { shada?: boolean }
 function M.save_remote(s, opts)
   remote(s.sock, ("require('sessman').save(nil, { shada = %s })"):format(opts and opts.shada and "true" or "false"))
 end
 
---- Stop a running session (its saved files are kept). Killing the current
---- session moves this UI to the previous one, or quits.
----@param s sessman.Session
----@param force? boolean Skip the confirmation
----@param list? boolean Killing the current session: open the list where we land
+--- Stop a running session; its files stay. Stopping this one moves the UI to
+--- the previous session (opening the list there if `list`), or quits.
+---@param force? boolean Don't ask
+---@param list? boolean
 function M.kill(s, force, list)
   if not s.running then
     return
@@ -831,8 +782,7 @@ function M.kill(s, force, list)
     local unsaved = vim.iter(api.nvim_list_bufs()):any(function(buf)
       return vim.bo[buf].modified
     end)
-    local msg = unsaved and "Session has unsaved changes. Kill anyway?" or ("Kill " .. s.name .. "?")
-    if not force and fn.confirm(msg, "&Yes\n&No", 2) ~= 1 then
+    if not force and not yes(unsaved and "Session has unsaved changes. Kill anyway?" or ("Kill " .. s.name .. "?")) then
       return
     end
     local prev = M.previous()
@@ -843,26 +793,22 @@ function M.kill(s, force, list)
       M.connect(prev.sock, false)
     end
     vim.cmd("qall!")
-    return
-  end
-  if not force and fn.confirm("Kill " .. s.name .. "?", "&Yes\n&No", 2) ~= 1 then
-    return
-  end
-  if remote(s.sock, "vim.cmd('qall!')") then
+  elseif (force or yes("Kill " .. s.name .. "?")) and remote(s.sock, "vim.cmd('qall!')") then
     vim.wait(2000, function()
       return not uv.fs_stat(s.sock)
     end, 10)
   end
 end
 
---- Delete a session's files, killing it first if it runs.
----@param s sessman.Session
+--- Remove a session's files, stopping it if it runs.
 function M.delete(s)
-  if s.unmanaged or fn.confirm("Delete session " .. s.name .. "?", "&Yes\n&No", 2) ~= 1 then
+  if s.unmanaged then
+    return err("not a session: nothing to delete")
+  elseif not yes("Delete session " .. s.name .. "?") then
     return
   end
-  -- A running session writes its ShaDa when it quits: point it back to the
-  -- global one first, or the deleted file comes back
+  -- It writes its ShaDa when it quits: point it back to the global one, or
+  -- the deleted file comes back
   if s.current then
     vim.o.shadafile = ""
   elseif s.running then

@@ -46,6 +46,11 @@ describe(":Session save", function()
     sessman.save("mine")
     sessman.save()
     sessman.save("mine")
+    sessman.save(env.project .. ":mine") -- its own name, written in full
+    assert.equals("Saved session mine", env.echoed[#env.echoed])
+    vim.fn.chdir(env.project .. "/sub") -- "mine" now resolves elsewhere
+    sessman.save("mine")
+    assert.equals("Saved session mine", env.echoed[#env.echoed])
     sessman.save("other")
     assert.matches("can't change", env.echoed[#env.echoed])
   end)

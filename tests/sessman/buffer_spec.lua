@@ -284,6 +284,13 @@ describe("sessman://sessions", function()
     end)
   end)
 
+  it("D on a plain nvim says it's not a session", function()
+    vim.cmd("Session")
+    goto_entry("Running", "(unnamed)")
+    env.feed("D")
+    assert.matches("not a session", env.echoed[#env.echoed])
+  end)
+
   it("s explains why it can't save a session that isn't running", function()
     vim.cmd("Session")
     goto_entry("Saved", "coding")
