@@ -49,8 +49,10 @@ subcommand. `:S` is the short form, like fugitive's `:G`; it isn't defined if
                         running, restore it if it's saved.
                         A session you leave keeps running. A plain nvim you
                         leave is stopped, unless that would lose something:
-                        unsaved changes or a running |:terminal|. Then it
-                        keeps running, listed as "(unnamed)".
+                        unsaved changes, or a |:terminal| running a program
+                        (your 'shell' idle at its prompt doesn't count; its
+                        scrollback is lost). Then it keeps running, listed
+                        as "(unnamed)".
 
 :Session switch -       Go to the running session you left most recently,
                         like `git switch -` or `:cd -`.

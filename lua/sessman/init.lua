@@ -395,8 +395,18 @@ function M.previous(sessions)
   return best
 end
 
+--- A shell at its prompt: the 'shell' program, with no child processes.
+local function idle_shell(buf)
+  local pid = fn.jobpid(vim.bo[buf].channel)
+  local proc = api.nvim_get_proc(pid)
+  return proc ~= nil
+    and proc.name == fs.basename(vim.o.shell:match("^%S+"))
+    and #api.nvim_get_proc_children(pid) == 0
+end
+
 --- Whether this plain nvim loses nothing if stopped when we leave it: no
---- unsaved changes, no running terminal (except `ignore`d ones, a picker's).
+--- unsaved changes, no terminal running a program (except `ignore`d ones, a
+--- picker's).
 local function disposable(ignore)
   if vim.g.sessman_session or #api.nvim_list_uis() > 1 then
     return false
@@ -409,6 +419,7 @@ local function disposable(ignore)
       vim.bo[buf].buftype == "terminal"
       and not (ignore and ignore[buf])
       and fn.jobwait({ vim.bo[buf].channel }, 0)[1] == -1
+      and not idle_shell(buf)
     then
       return false
     end

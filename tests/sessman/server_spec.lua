@@ -79,6 +79,40 @@ describe("servers", function()
     assert.is_false(connects[1].stop)
   end)
 
+  describe("a terminal with a shell", function()
+    local shell = vim.o.shell
+    after_each(function()
+      vim.o.shell = shell
+    end)
+
+    --- :terminal running /bin/sh; returns the shell's pid
+    local function terminal()
+      vim.o.shell = "/bin/sh"
+      vim.cmd("terminal")
+      local pid = vim.fn.jobpid(vim.bo.channel)
+      vim.wait(2000, function()
+        return vim.api.nvim_get_proc(pid) ~= nil
+      end, 10)
+      return pid
+    end
+
+    it("doesn't keep the plain nvim when idle at its prompt", function()
+      terminal()
+      sessman.new("fresh")
+      assert.is_true(connects[1].stop)
+    end)
+
+    it("keeps it while running something", function()
+      local pid = terminal()
+      vim.fn.chansend(vim.bo.channel, "sleep 30\n")
+      assert.is_true(vim.wait(2000, function()
+        return #vim.api.nvim_get_proc_children(pid) > 0
+      end, 10))
+      sessman.new("fresh")
+      assert.is_false(connects[1].stop)
+    end)
+  end)
+
   describe("switch() without a target: picker", function()
     local select = vim.ui.select
     after_each(function()
