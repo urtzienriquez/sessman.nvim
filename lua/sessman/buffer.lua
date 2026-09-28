@@ -113,15 +113,6 @@ function M.read(buf)
     -- is restored, its window goes away
     vim.bo[buf].buftype, vim.bo[buf].bufhidden, vim.bo[buf].buflisted = "nofile", "wipe", false
     vim.schedule(function()
-      for _, win in ipairs(fn.win_findbuf(buf)) do
-        if #api.nvim_tabpage_list_wins(api.nvim_win_get_tabpage(win)) > 1 then
-          pcall(api.nvim_win_close, win, true)
-        else
-          api.nvim_win_call(win, function()
-            vim.cmd("enew")
-          end)
-        end
-      end
       pcall(api.nvim_buf_delete, buf, { force = true })
     end)
     return
@@ -243,9 +234,7 @@ function M.read(buf)
   map("[[", function()
     jump(state[buf].groups, -1)
   end, "Previous group")
-  map("gq", function()
-    vim.cmd(#api.nvim_tabpage_list_wins(0) > 1 and "close" or "bwipeout")
-  end, "Close")
+  map("gq", "<Cmd>bwipeout<CR>", "Close")
   map("g?", "<Cmd>help sessman-maps<CR>", "Help")
 
   api.nvim_create_autocmd("BufWipeout", {

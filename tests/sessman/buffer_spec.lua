@@ -252,6 +252,22 @@ describe("sessman://sessions", function()
     assert.is_nil(env.find_buf("sessman://sessions"))
   end)
 
+  it("gq works as the only window, also with a floating window open", function()
+    vim.cmd.edit(env.project .. "/a.txt")
+    vim.cmd("Session")
+    vim.cmd("only")
+    vim.api.nvim_open_win(vim.api.nvim_create_buf(false, true), false, {
+      relative = "editor",
+      row = 1,
+      col = 1,
+      width = 5,
+      height = 1,
+    }) -- like ui2's command line
+    env.feed("gq")
+    assert.is_nil(env.find_buf("sessman://sessions"))
+    assert.equals("a.txt", vim.fs.basename(vim.api.nvim_buf_get_name(0)))
+  end)
+
   it("replaces an empty stand-in restored by an old session file", function()
     vim.cmd("enew | file sessman://sessions")
     vim.cmd.edit(env.project .. "/a.txt")

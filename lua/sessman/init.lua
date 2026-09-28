@@ -447,26 +447,12 @@ local function disposable(ignore)
 end
 
 --- Remove sessman's buffers: they'd stay behind in the server we leave, and
---- :mksession would record them. A tab's last window gets another buffer.
-local function close_windows()
-  local function ours(buf)
-    local name = api.nvim_buf_get_name(buf)
-    return name == "sessman://sessions" or name == "sessman://excluded"
-  end
-  for _, win in ipairs(api.nvim_list_wins()) do
-    if api.nvim_win_is_valid(win) and ours(api.nvim_win_get_buf(win)) then
-      if #api.nvim_tabpage_list_wins(api.nvim_win_get_tabpage(win)) > 1 then
-        pcall(api.nvim_win_close, win, true)
-      else
-        api.nvim_win_call(win, function()
-          local alt = fn.bufnr("#")
-          vim.cmd(alt > 0 and fn.buflisted(alt) == 1 and not ours(alt) and ("buffer " .. alt) or "enew")
-        end)
-      end
-    end
-  end
+--- :mksession would record them. Deleting a buffer closes its windows, or
+--- shows another buffer in a last window.
+local function remove_own_buffers()
   for _, buf in ipairs(api.nvim_list_bufs()) do
-    if ours(buf) then
+    local name = api.nvim_buf_get_name(buf)
+    if name == "sessman://sessions" or name == "sessman://excluded" then
       pcall(api.nvim_buf_delete, buf, { force = true })
     end
   end
@@ -475,7 +461,7 @@ end
 --- Move this UI to another server (:connect! stops the one we leave).
 --- Replaced in tests.
 function M.connect_ui(addr, stop_old)
-  close_windows()
+  remove_own_buffers()
   vim.cmd.connect({ args = { addr }, bang = stop_old })
 end
 
@@ -780,7 +766,7 @@ function M.save(name, opts)
     M.serve()
   end
 
-  close_windows()
+  remove_own_buffers()
   fn.mkdir(fs.dirname(s.file), "p")
   mksession(s.file)
 
