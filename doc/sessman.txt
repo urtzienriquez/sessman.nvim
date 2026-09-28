@@ -95,7 +95,9 @@ subcommand. `:S` is the short form, like fugitive's `:G`; it isn't defined if
                                                                *:Session-kill*
 :Session kill [target]  Stop a running session: its server quits, its files
                         stay. Without [target], the current session: you
-                        move to the previous one, or Nvim quits.
+                        move to the previous one, or Nvim quits. It asks
+                        first, and says so if the session has unsaved
+                        changes.
 
                                                              *:Session-delete*
 :Session delete {target}

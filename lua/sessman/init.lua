@@ -420,7 +420,8 @@ end
 --- :mksession would record them. A tab's last window gets another buffer.
 local function close_windows()
   local function ours(buf)
-    return api.nvim_buf_get_name(buf):match("^sessman://") ~= nil
+    local name = api.nvim_buf_get_name(buf)
+    return name == "sessman://sessions" or name == "sessman://excluded"
   end
   for _, win in ipairs(api.nvim_list_wins()) do
     if api.nvim_win_is_valid(win) and ours(api.nvim_win_get_buf(win)) then
@@ -753,16 +754,20 @@ function M.save(name, opts)
   api.nvim_echo({ { "Saved session " .. s.name .. (shada and " with its ShaDa" or "") } }, false, {})
 end
 
---- Run Lua in another server, without waiting for it.
-local function remote(addr, code)
+--- Run Lua in another server: scheduled there, or with `wait`, evaluated and
+--- its result returned. False if the server can't be reached.
+local function remote(addr, code, wait)
   local ok, chan = pcall(fn.sockconnect, "pipe", addr, { rpc = true })
   if not ok or chan <= 0 then
     return false
   end
-  pcall(vim.rpcrequest, chan, "nvim_exec_lua", "vim.schedule(function() " .. code .. " end)", {})
+  local _, result =
+    pcall(vim.rpcrequest, chan, "nvim_exec_lua", wait and code or ("vim.schedule(function() " .. code .. " end)"), {})
   fn.chanclose(chan)
-  return true
+  return not wait or result
 end
+
+local UNSAVED = "return vim.iter(vim.api.nvim_list_bufs()):any(function(b) return vim.bo[b].modified end)"
 
 --- Ask another running session to save itself.
 ---@param opts? { shada?: boolean }
@@ -778,13 +783,18 @@ function M.kill(s, force, list)
   if not s.running then
     return
   end
-  if s.current then
-    local unsaved = vim.iter(api.nvim_list_bufs()):any(function(buf)
-      return vim.bo[buf].modified
-    end)
-    if not force and not yes(unsaved and "Session has unsaved changes. Kill anyway?" or ("Kill " .. s.name .. "?")) then
+  if not force then
+    local unsaved
+    if s.current then
+      unsaved = load(UNSAVED)()
+    else
+      unsaved = remote(s.sock, UNSAVED, true) == true
+    end
+    if not yes(unsaved and (s.name .. " has unsaved changes. Kill anyway?") or ("Kill " .. s.name .. "?")) then
       return
     end
+  end
+  if s.current then
     local prev = M.previous()
     if prev then
       if list then
@@ -793,7 +803,7 @@ function M.kill(s, force, list)
       M.connect(prev.sock, false)
     end
     vim.cmd("qall!")
-  elseif (force or yes("Kill " .. s.name .. "?")) and remote(s.sock, "vim.cmd('qall!')") then
+  elseif remote(s.sock, "vim.cmd('qall!')") then
     vim.wait(2000, function()
       return not uv.fs_stat(s.sock)
     end, 10)

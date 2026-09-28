@@ -26,7 +26,7 @@ end
 
 vim.api.nvim_create_autocmd("BufReadCmd", {
   group = vim.api.nvim_create_augroup("sessman_buffer", {}),
-  pattern = "sessman://*",
+  pattern = { "sessman://sessions", "sessman://excluded" },
   callback = function(ev)
     require("sessman.buffer").read(ev.buf)
   end,

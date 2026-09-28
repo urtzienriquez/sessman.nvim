@@ -105,7 +105,7 @@ local function jump(lnums, dir)
   end
 end
 
---- BufReadCmd for sessman:// buffers.
+--- BufReadCmd for sessman://sessions and sessman://excluded.
 ---@param buf integer
 function M.read(buf)
   if api.nvim_buf_get_name(buf) == "sessman://excluded" then

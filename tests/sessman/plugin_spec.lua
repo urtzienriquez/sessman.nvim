@@ -9,7 +9,7 @@ describe("plugin/sessman.lua", function()
     assert.is_not_nil(cmds.Session)
     assert.is_not_nil(cmds.S)
     assert.is_nil(cmds.SessionSave)
-    assert.equals(1, #vim.api.nvim_get_autocmds({ group = "sessman_buffer", event = "BufReadCmd" }))
+    assert.equals(2, #vim.api.nvim_get_autocmds({ group = "sessman_buffer", event = "BufReadCmd" }))
 
     for mod in pairs(package.loaded) do
       assert.is_nil(mod:match("^sessman"), mod .. " loaded at startup")
@@ -18,7 +18,14 @@ describe("plugin/sessman.lua", function()
 
   it("is idempotent", function()
     vim.cmd.source(root .. "/plugin/sessman.lua")
-    assert.equals(1, #vim.api.nvim_get_autocmds({ group = "sessman_buffer", event = "BufReadCmd" }))
+    assert.equals(2, #vim.api.nvim_get_autocmds({ group = "sessman_buffer", event = "BufReadCmd" }))
+  end)
+
+  it("only handles its own sessman:// buffers", function()
+    vim.cmd.edit("sessman://foo")
+    assert.are_not.equals("sessman", vim.bo.filetype)
+    assert.same({ "" }, vim.api.nvim_buf_get_lines(0, 0, -1, false))
+    vim.cmd("bwipeout!")
   end)
 
   it("leaves an existing :S alone (e.g. vim-abolish)", function()
