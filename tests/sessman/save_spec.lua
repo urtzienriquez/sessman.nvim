@@ -34,7 +34,7 @@ describe(":Session save", function()
     assert.matches("add ! to override", env.echoed[#env.echoed])
     assert.is_nil(vim.g.sessman_session)
     sessman.save("taken", { bang = true })
-    assert.are_not.same({ "original" }, vim.fn.readfile(sessman.new(env.project, "taken").file))
+    assert.are_not.same({ "original" }, vim.fn.readfile(sessman.session(env.project, "taken").file))
   end)
 
   it("adopts into global: and path targets", function()

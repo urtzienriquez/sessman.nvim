@@ -55,6 +55,18 @@ subcommand. `:S` is the short form, like fugitive's `:G`; it isn't defined if
 :Session switch -       Go to the running session you left most recently,
                         like `git switch -` or `:cd -`.
 
+:Session switch         Pick the session to go to with |vim.ui.select()|,
+                        and so with any picker that replaces it (fzf-lua,
+                        telescope, snacks, mini.pick...). It offers what the
+                        session buffer lists, running sessions, saved ones
+                        and "(unnamed)" plain nvims, shown as
+                        `~/full/path:name`. See |sessman-api| for a picker of
+                        running ones only.
+                        Most recent first: running sessions by when you left
+                        them (the first is where `:Session switch -` goes),
+                        then plain nvims, then saved ones by last save; the
+                        current one last.
+
                                                                 *:Session-new*
 :Session new {target}   Create a new, empty session {target} and go to it,
                         like tmux `new-session`. It starts in the project's
@@ -198,8 +210,11 @@ No mappings are defined; for instance: >lua
       { desc = "Session list" })
     vim.keymap.set("n", "<leader>sp", "<Cmd>Session switch -<CR>",
       { desc = "Previous session" })
-    vim.keymap.set("n", "<leader>sl", function() require("sessman").pick() end,
-      { desc = "Pick a session" })
+    vim.keymap.set("n", "<leader>sl", "<Cmd>Session switch<CR>",
+      { desc = "Switch session" })
+    vim.keymap.set("n", "<leader>sr", function()
+      require("sessman").switch({ running = true })
+    end, { desc = "Switch to a running session" })
 <
 Keep `require()` inside the function, as above, so sessman still loads only
 when the map is used.
@@ -213,11 +228,13 @@ LUA API                                                          *sessman-api*
 require("sessman") ~
 
   switch({target})     Same as `:Session switch {target}`.
-  create({target})     Same as `:Session new {target}`.
+  switch([{opts}])     Same as `:Session switch`: pick a session. With
+                       `{ running = true }`, only the other running
+                       sessions and plain nvims; with `{ running = false }`,
+                       only the saved sessions that aren't running.
+  new({target})        Same as `:Session new {target}`.
   save([{target}], [{opts}])
                        Same as `:Session save`. {opts}: `bang`, `shada`.
-  pick()               Choose a session with |vim.ui.select()|, and so with
-                       any picker that replaces it.
   list()               All sessions: tables with `project` (false when
                        global), `name`, `file`, `sock`, and `saved`,
                        `running`, `current`, `cwd`, and `unmanaged` (an

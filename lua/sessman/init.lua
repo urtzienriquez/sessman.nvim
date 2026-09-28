@@ -29,7 +29,7 @@ local function err(msg)
 end
 
 ---@return string
-function M.dir()
+local function dir()
   return fs.normalize(vim.g.sessman_dir or (fn.stdpath("data") .. "/session"))
 end
 
@@ -60,8 +60,8 @@ end
 ---@param project string|false
 ---@param name string
 ---@return sessman.Session
-function M.new(project, name)
-  local base = fs.joinpath(M.dir(), encode(project), name)
+function M.session(project, name)
+  local base = fs.joinpath(dir(), encode(project), name)
   local id = fn.sha256((project or "") .. "\0" .. name):sub(1, 12)
   return {
     project = project,
@@ -76,13 +76,7 @@ end
 ---@return sessman.Session?
 function M.current()
   local id = vim.g.sessman_session
-  return id and M.new(id.project, id.name) or nil
-end
-
----@param a sessman.Session?
----@param b sessman.Session?
-local function same(a, b)
-  return a ~= nil and b ~= nil and a.project == b.project and a.name == b.name
+  return id and M.session(id.project, id.name) or nil
 end
 
 ---@param addr string
@@ -96,16 +90,6 @@ local function alive(addr)
     return true
   end
   return false
-end
-
-local function readfile(path)
-  local f = io.open(path, "r")
-  if not f then
-    return
-  end
-  local data = f:read("*a")
-  f:close()
-  return data
 end
 
 --- Plain nvim instances (not sessman sessions), deduplicated by pid.
@@ -146,13 +130,13 @@ function M.list()
   local function get(project, name)
     local key = (project or "") .. "\0" .. name
     if not by_key[key] then
-      by_key[key] = M.new(project, name)
+      by_key[key] = M.session(project, name)
       out[#out + 1] = by_key[key]
     end
     return by_key[key]
   end
 
-  local root = M.dir()
+  local root = dir()
   for dirname, type in fs.dir(root) do
     local project = type == "directory" and decode(dirname)
     if project ~= nil then
@@ -171,7 +155,7 @@ function M.list()
   for file in fs.dir(run) do
     if file:sub(-5) == ".json" then
       local path = fs.joinpath(run, file)
-      local ok, st = pcall(vim.json.decode, readfile(path) or "")
+      local ok, st = pcall(vim.json.decode, table.concat(fn.readfile(path)))
       local sock = path:sub(1, -6)
       if ok and type(st) == "table" and st.name and alive(sock) then
         local s = get(st.project, st.name)
@@ -186,7 +170,7 @@ function M.list()
 
   local cur = M.current()
   for _, s in ipairs(out) do
-    s.current = same(s, cur) or nil
+    s.current = cur and s.project == cur.project and s.name == cur.name or nil
   end
   if cur and not by_key[(cur.project or "") .. "\0" .. cur.name] then
     -- Current session not (yet) visible on disk, e.g. mid-adoption
@@ -203,12 +187,32 @@ function M.here()
   return fs.normalize(fs.root(cwd, ".git") or cwd)
 end
 
+--- The project an entry is listed under: a session's own, or for a plain
+--- nvim the git root of its working directory (or the directory itself).
+---@param s sessman.Session
+---@return string|false
+function M.project_of(s)
+  if not s.unmanaged then
+    return s.project
+  end
+  local dir = s.name:sub(1, 1) == "/" and s.name
+  return dir and fs.normalize(fs.root(dir, ".git") or dir) or s.name
+end
+
+--- How the list and the picker show an entry: ~/full/path:name
+---@param s sessman.Session
+---@return string
+function M.display(s)
+  local project = M.project_of(s)
+  return (project and fn.fnamemodify(project, ":~") or "global") .. ":" .. (s.unmanaged and "(unnamed)" or s.name)
+end
+
 --- Short name of a project: "global", its directory name, or ~/path when
 --- another project has the same directory name.
 ---@param project string|false
 ---@param sessions sessman.Session[]
 ---@return string
-function M.project_label(project, sessions)
+local function project_label(project, sessions)
   if not project then
     return "global"
   end
@@ -229,12 +233,7 @@ end
 ---@param sessions sessman.Session[]
 ---@return string
 function M.label(s, here, sessions)
-  if s.unmanaged then
-    return fn.fnamemodify(s.name, ":~")
-  elseif s.project == here then
-    return s.name
-  end
-  return M.project_label(s.project, sessions) .. ":" .. s.name
+  return s.project == here and s.name or (project_label(s.project, sessions) .. ":" .. s.name)
 end
 
 --- Resolve a :Session target, "name" or "project:name" (like fugitive's
@@ -258,17 +257,17 @@ function M.resolve(target, sessions)
       return nil, ("'%s': write {project}:{name}, e.g. ~/papers/thesis:writing"):format(target)
     end
     local here = M.here()
-    return find(here, target) or find(false, target) or M.new(here, target)
+    return find(here, target) or find(false, target) or M.session(here, target)
   elseif proj == "" then
     return nil, "missing project before ':' (global sessions: global:" .. name .. ")"
   elseif proj == "global" then
-    return find(false, name) or M.new(false, name)
+    return find(false, name) or M.session(false, name)
   elseif proj:find("/") or proj:find("^~") or proj == "." or proj == ".." then
     local path = abspath(proj)
     if fn.isdirectory(path) == 0 then
       return nil, "not a directory: " .. path
     end
-    return find(path, name) or M.new(path, name)
+    return find(path, name) or M.session(path, name)
   end
 
   local matches = {}
@@ -281,9 +280,9 @@ function M.resolve(target, sessions)
   if #projects > 1 then
     return nil, "ambiguous project '" .. proj .. "', use its path"
   elseif #projects == 1 then
-    return find(projects[1], name) or M.new(projects[1], name)
+    return find(projects[1], name) or M.session(projects[1], name)
   elseif fn.isdirectory(proj) == 1 then
-    return find(abspath(proj), name) or M.new(abspath(proj), name)
+    return find(abspath(proj), name) or M.session(abspath(proj), name)
   end
   return nil, "unknown project: " .. proj
 end
@@ -372,9 +371,9 @@ function M.command(o)
   end
 
   if sub == "switch" then
-    return need_target() and M.switch(target)
+    return M.switch(target) -- no target: pick one
   elseif sub == "new" then
-    return need_target() and M.create(target)
+    return need_target() and M.new(target)
   elseif sub == "save" then
     return M.save(target, { bang = o.bang })
   elseif sub == "kill" then
@@ -469,9 +468,7 @@ end
 ---@return boolean ok
 local function spawn(s)
   fn.mkdir(rundir(), "p")
-  if uv.fs_stat(s.sock) then
-    os.remove(s.sock) -- stale: list() found it dead
-  end
+  os.remove(s.sock) -- a stale one, if list() found it dead
 
   local ident = ("lua vim.g.sessman_session={project=%s,name=%q}"):format(
     s.project and ("%q"):format(s.project) or "false",
@@ -481,10 +478,10 @@ local function spawn(s)
   -- the size of the UI that will attach, not the headless 80x24.
   local size = ("set columns=%d lines=%d"):format(vim.o.columns, vim.o.lines)
   local cmd = { vim.v.progpath, "--headless", "--listen", s.sock, "--cmd", ident, "--cmd", size }
-  if s.saved and uv.fs_stat(s.shada) then
-    vim.list_extend(cmd, { "-i", s.shada })
-  end
   if s.saved then
+    if uv.fs_stat(s.shada) then
+      vim.list_extend(cmd, { "-i", s.shada })
+    end
     vim.list_extend(cmd, { "-c", "source " .. fn.fnameescape(s.file) })
   end
   vim.list_extend(cmd, { "-c", "lua require('sessman').attach()" })
@@ -524,10 +521,76 @@ function M.open(s, opts)
   end
 end
 
+--- Pick a session, or plain nvim, with vim.ui.select (and so any picker
+--- that hooks it) and go there.
+---@param running? boolean true: the running ones but this one; false: the not running ones
+local function pick(running)
+  local items = vim.tbl_filter(function(s)
+    if running == nil then
+      return true
+    end
+    return running and (s.running and not s.current) or (not running and not s.running)
+  end, M.list())
+  local what = running == nil and "session" or running and "other running session" or "saved session not running"
+  if #items == 0 then
+    return err("no " .. what)
+  end
+
+  -- Most recent first: running sessions by when they were left (the first is
+  -- where `switch -` goes), plain nvims, saved ones by last save; this one last
+  local function key(s)
+    return {
+      s.current and 1 or 0,
+      s.unmanaged and 1 or s.running and 0 or 2,
+      -((s.running and s.active) or s.mtime or 0),
+      M.display(s),
+    }
+  end
+  table.sort(items, function(a, b)
+    local ka, kb = key(a), key(b)
+    for i = 1, #ka do
+      if ka[i] ~= kb[i] then
+        return ka[i] < kb[i]
+      end
+    end
+    return false
+  end)
+
+  -- Pickers like fzf-lua run in a terminal that is still alive when they
+  -- call back: it must not count as "a running terminal worth keeping".
+  local before = {}
+  for _, buf in ipairs(api.nvim_list_bufs()) do
+    before[buf] = vim.bo[buf].buftype == "terminal" or nil
+  end
+
+  vim.ui.select(items, {
+    prompt = running == nil and "Session " or running and "Running session " or "Saved session ",
+    format_item = function(s)
+      local label = M.display(s)
+      return s.current and (label .. "  (current)") or s.running and (label .. "  (running)") or label
+    end,
+  }, function(s)
+    if not s then
+      return
+    end
+    local ignore = {}
+    for _, buf in ipairs(api.nvim_list_bufs()) do
+      ignore[buf] = vim.bo[buf].buftype == "terminal" and not before[buf] or nil
+    end
+    vim.schedule(function() -- let the picker close first
+      M.open(s, { ignore = ignore })
+    end)
+  end)
+end
+
 --- :Session switch {target}: jump to a running session or restore a saved
---- one. "-" is the previous session.
----@param target string
+--- one; "-" is the previous session. Without a target, pick one;
+--- `switch({ running = true })` picks among the running ones.
+---@param target? string|{ running?: boolean }
 function M.switch(target)
+  if type(target) ~= "string" then
+    return pick(target and target.running)
+  end
   local sessions = M.list()
   local s, msg
   if target == "-" then
@@ -545,7 +608,7 @@ end
 
 --- :Session new {target}: create a fresh session and switch to it.
 ---@param target string
-function M.create(target)
+function M.new(target)
   local s, msg = M.resolve(target, M.list())
   if not s then
     return err(msg)
@@ -722,15 +785,6 @@ function M.save(name, opts)
   api.nvim_echo({ { "Saved session " .. s.name } }, false, {})
 end
 
-local function modified()
-  for _, buf in ipairs(api.nvim_list_bufs()) do
-    if vim.bo[buf].modified then
-      return true
-    end
-  end
-  return false
-end
-
 --- Run a Lua chunk in another server without waiting for it to finish.
 ---@param addr string
 ---@param code string
@@ -748,9 +802,6 @@ end
 ---@param s sessman.Session
 ---@param opts? { shada?: boolean }
 function M.save_remote(s, opts)
-  if s.current then
-    return M.save(nil, opts)
-  end
   remote(s.sock, ("require('sessman').save(nil, { shada = %s })"):format(opts and opts.shada and "true" or "false"))
 end
 
@@ -763,7 +814,10 @@ function M.kill(s, force)
     return
   end
   if s.current then
-    local msg = modified() and "Session has unsaved changes. Kill anyway?" or ("Kill " .. s.name .. "?")
+    local unsaved = vim.iter(api.nvim_list_bufs()):any(function(buf)
+      return vim.bo[buf].modified
+    end)
+    local msg = unsaved and "Session has unsaved changes. Kill anyway?" or ("Kill " .. s.name .. "?")
     if not force and fn.confirm(msg, "&Yes\n&No", 2) ~= 1 then
       return
     end
@@ -794,53 +848,6 @@ function M.delete(s)
   os.remove(s.shada)
   fn.delete(fs.dirname(s.file), "d") -- only if empty
   M.kill(s, true)
-end
-
---- Pick a session with vim.ui.select (and so with any picker that hooks it).
-function M.pick()
-  local items = vim.tbl_filter(function(s)
-    return not s.unmanaged
-  end, M.list())
-
-  -- Pickers like fzf-lua run in a terminal that is still alive when they
-  -- call back: it must not count as "a running terminal worth keeping".
-  local before = {}
-  for _, buf in ipairs(api.nvim_list_bufs()) do
-    before[buf] = vim.bo[buf].buftype == "terminal" or nil
-  end
-  local function picker_terminals()
-    local out = {}
-    for _, buf in ipairs(api.nvim_list_bufs()) do
-      if vim.bo[buf].buftype == "terminal" and not before[buf] then
-        out[buf] = true
-      end
-    end
-    return out
-  end
-
-  vim.ui.select(items, {
-    prompt = "Session ",
-    format_item = function(s)
-      -- Full project path: directory names can clash between projects
-      local label = (s.project and fn.fnamemodify(s.project, ":~") or "global") .. ":" .. s.name
-      return s.current and (label .. "  (current)") or s.running and (label .. "  (running)") or label
-    end,
-  }, function(s)
-    if s then
-      local ignore = picker_terminals()
-      vim.schedule(function() -- let the picker close first
-        M.open(s, { ignore = ignore })
-      end)
-    end
-  end)
-end
-
---- Compatibility with the old setup() call; configuration is vim.g.sessman_dir.
----@param opts? { session_dir?: string }
-function M.setup(opts)
-  if opts and opts.session_dir then
-    vim.g.sessman_dir = opts.session_dir
-  end
 end
 
 return M

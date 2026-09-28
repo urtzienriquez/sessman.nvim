@@ -37,63 +37,43 @@ local function pad(text, width)
   return text .. (" "):rep(width - fn.strdisplaywidth(text))
 end
 
-local UNNAMED = "(unnamed)"
-
---- Sections by state, like fugitive's Untracked/Unstaged/Staged; inside
---- them, sessions are grouped by project (the one you are in first). A plain
---- nvim is a running nvim without a name: "(unnamed)" in its project.
+--- Sections by state, like fugitive's Untracked/Unstaged/Staged, one line
+--- per session as project:name: the project you are in first, "global" last.
+--- A plain nvim is a running nvim without a name: "(unnamed)".
 ---@param buf integer
 function M.render(buf)
   local sessman = require("sessman")
-  local sessions = sessman.list()
   local here = sessman.here()
 
-  -- The project each entry is listed under; plain nvims by their directory
-  local group = {} ---@type table<sessman.Session, string|false>
+  local labels, rank = {}, {}
   local sections = { { title = "Running", list = {} }, { title = "Saved", list = {} } }
-  for _, s in ipairs(sessions) do
-    if s.unmanaged then
-      local dir = s.name:sub(1, 1) == "/" and s.name
-      group[s] = dir and vim.fs.normalize(vim.fs.root(dir, ".git") or dir) or s.name
-    else
-      group[s] = s.project
-    end
+  for _, s in ipairs(sessman.list()) do
+    local project = sessman.project_of(s)
+    labels[s], rank[s] = sessman.display(s), project == here and 0 or project and 1 or 2
     table.insert(sections[s.running and 1 or 2].list, s)
-  end
-
-  local function rank(s)
-    return group[s] == here and 0 or group[s] and 1 or 2
-  end
-  local function name(s)
-    return s.unmanaged and UNNAMED or s.name
-  end
-  local function before(a, b)
-    if rank(a) ~= rank(b) then
-      return rank(a) < rank(b)
-    elseif group[a] ~= group[b] then
-      return group[a] < group[b]
-    end
-    return name(a) < name(b)
   end
 
   local cur = sessman.current()
   local lines = {
-    "Session: " .. (cur and cur.name or UNNAMED),
+    "Session: " .. (cur and cur.name or "(unnamed)"),
     "Project: " .. fn.fnamemodify(here, ":~"),
     "Help:    g?",
   }
   local st = { entries = {}, groups = {} }
   for _, section in ipairs(sections) do
     if #section.list > 0 then
-      table.sort(section.list, before)
+      table.sort(section.list, function(a, b)
+        if rank[a] ~= rank[b] then
+          return rank[a] < rank[b]
+        end
+        return labels[a] < labels[b]
+      end)
       lines[#lines + 1] = ""
       lines[#lines + 1] = ("%s (%d)"):format(section.title, #section.list)
       st.groups[#st.groups + 1] = #lines
 
-      -- One line per session, written as in :Session: project:name
-      local labels, width = {}, 0
+      local width = 0
       for _, s in ipairs(section.list) do
-        labels[s] = (group[s] and fn.fnamemodify(group[s], ":~") or "global") .. ":" .. name(s)
         width = math.max(width, fn.strdisplaywidth(labels[s]))
       end
       for _, s in ipairs(section.list) do

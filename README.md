@@ -7,7 +7,7 @@ Named Neovim sessions that keep **running** (survive closing the terminal) or st
 One command, like fugitive's `:Git` (`:S` for short, like `:G`):
 
 - `:Session` — list every session, grouped by project (fugitive-style buffer, `g?` for maps)
-- `:Session switch coding` — jump to it if running, restore it if saved; `:Session switch -` goes back
+- `:Session switch coding` — jump to it if running, restore it if saved; `:Session switch -` goes back; `:Session switch` picks one
 - `:Session new ~/papers/thesis:writing` — a new session `writing` in the project `~/papers/thesis` (`project:name`, like fugitive's `HEAD:file`)
 - `:Session save` — save the current session; `:Session save notes` turns a plain nvim into a session
 - `:Session kill [name]`, `:Session delete name` — stop a session / remove it
@@ -29,7 +29,8 @@ vim.g.sessman_dir = vim.fn.expand("~/sessions") -- default: stdpath("data") .. "
 vim.g.sessman_exclude = { "R-console" } -- buffers never saved into session files (e.g. REPL consoles)
 vim.keymap.set("n", "<leader>ss", "<Cmd>Session<CR>", { desc = "Session list" })
 vim.keymap.set("n", "<leader>sp", "<Cmd>Session switch -<CR>", { desc = "Previous session" })
-vim.keymap.set("n", "<leader>sl", function() require("sessman").pick() end, { desc = "Pick a session" })
+vim.keymap.set("n", "<leader>sl", "<Cmd>Session switch<CR>", { desc = "Switch session" })
+vim.keymap.set("n", "<leader>sr", function() require("sessman").switch({ running = true }) end, { desc = "Switch to a running session" })
 ```
 
 ## Credits

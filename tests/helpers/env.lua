@@ -107,7 +107,7 @@ end
 ---@param name string
 ---@param lines? string[]
 function M.write_session(project, name, lines)
-  local s = require("sessman").new(project, name)
+  local s = require("sessman").session(project, name)
   vim.fn.mkdir(vim.fs.dirname(s.file), "p")
   vim.fn.writefile(lines or { '" fake session' }, s.file)
   return s
