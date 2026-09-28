@@ -184,6 +184,24 @@ describe("sessman://sessions", function()
     assert.same(rows({ { false, "notes", "just now" } }), section("Saved"))
   end)
 
+  it("visual X kills and visual D deletes the selected sessions", function()
+    sessman.new("fresh")
+    sessman.new("other")
+    vim.cmd("Session")
+    local asked = env.stub_confirm(1)
+    goto_entry("Running", "fresh")
+    env.feed("VjX") -- fresh and other
+    assert.equals("Kill 2 sessions?", asked[1])
+    assert.is_nil(sessman.resolve("fresh", sessman.list()).running)
+    assert.is_nil(sessman.resolve("other", sessman.list()).running)
+
+    goto_entry("Saved", "coding")
+    env.feed("VjD") -- coding and global:notes
+    assert.equals("Delete 2 sessions?", asked[2])
+    assert.equals(0, vim.fn.filereadable(sessman.session(env.project, "coding").file))
+    assert.equals(0, vim.fn.filereadable(sessman.session(false, "notes").file))
+  end)
+
   it("s saves a running session", function()
     sessman.new("fresh")
     vim.cmd("Session")

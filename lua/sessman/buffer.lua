@@ -202,10 +202,31 @@ function M.read(buf)
   map("<CR>", act(sessman.open), "Go to session")
   map("s", save(false), "Save session")
   map("S", save(true), "Save session with ShaDa")
-  map("X", act(function(s)
+  local function kill(s)
     sessman.kill(s, false, true) -- reopen the list where we land
-  end), "Kill session")
+  end
+  map("X", act(kill), "Kill session")
   map("D", act(sessman.delete), "Delete session")
+
+  --- Visual mode: an action on all the selected entries, then a refresh.
+  local function selected(f)
+    return function()
+      local from, to = fn.line("v"), fn.line(".")
+      vim.cmd("normal! \27") -- leave visual mode
+      local entries = {}
+      for l = math.min(from, to), math.max(from, to) do
+        entries[#entries + 1] = state[buf].entries[l]
+      end
+      if #entries > 0 then
+        f(entries)
+        if api.nvim_buf_is_valid(buf) then
+          M.render(buf)
+        end
+      end
+    end
+  end
+  vim.keymap.set("x", "X", selected(kill), { buffer = buf, desc = "Kill the selected sessions" })
+  vim.keymap.set("x", "D", selected(sessman.delete), { buffer = buf, desc = "Delete the selected sessions" })
   vim.keymap.set("n", "co<Space>", ":Session switch ", { buffer = buf, desc = "Populate :Session switch" })
   vim.keymap.set("n", "cn<Space>", ":Session new ", { buffer = buf, desc = "Populate :Session new" })
   vim.keymap.set("n", "cs<Space>", ":Session save ", { buffer = buf, desc = "Populate :Session save" })

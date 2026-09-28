@@ -366,6 +366,15 @@ function M.command(o)
     return need_target() and M.new(target)
   elseif sub == "save" then
     return M.save(target, { bang = o.bang, shada = shada })
+  elseif sub == "kill" and o.range == 2 and not target then
+    -- :%S kill: every other running one, like :%detach spares this UI
+    local others = vim.tbl_filter(function(x)
+      return x.running and not x.current
+    end, M.list())
+    if #others == 0 then
+      return err("no other running session")
+    end
+    return M.kill(others)
   elseif sub == "kill" then
     local s
     if target then
@@ -786,59 +795,95 @@ function M.save_remote(s, opts)
   remote(s.sock, ("require('sessman').save(nil, { shada = %s })"):format(opts and opts.shada and "true" or "false"))
 end
 
---- Stop a running session; its files stay. Stopping this one moves the UI to
---- the previous session (opening the list there if `list`), or quits.
+--- One session or a list of them, the current one last (acting on it may
+--- move us away or quit).
+local function batch(s)
+  local out, cur = {}, nil
+  for _, x in ipairs(s.sock and { s } or s) do
+    if x.current then
+      cur = x
+    else
+      out[#out + 1] = x
+    end
+  end
+  out[#out + 1] = cur
+  return out
+end
+
+--- Stop running sessions (one or a list); their files stay. Stopping this one
+--- moves the UI to the previous session (opening the list there if `list`),
+--- or quits.
 ---@param force? boolean Don't ask
 ---@param list? boolean
 function M.kill(s, force, list)
-  if not s.running then
+  local all = vim.tbl_filter(function(x)
+    return x.running
+  end, batch(s))
+  if #all == 0 then
     return
   end
   if not force then
-    local unsaved
-    if s.current then
-      unsaved = load(UNSAVED)()
+    local unsaved = vim.tbl_filter(function(x)
+      if x.current then
+        return load(UNSAVED)()
+      end
+      return remote(x.sock, UNSAVED, true) == true
+    end, all)
+    local question
+    if #all == 1 then
+      question = #unsaved > 0 and (all[1].name .. " has unsaved changes. Kill anyway?") or ("Kill " .. all[1].name .. "?")
     else
-      unsaved = remote(s.sock, UNSAVED, true) == true
+      question = ("Kill %d sessions?"):format(#all)
+      if #unsaved > 0 then
+        local names = table.concat(vim.tbl_map(M.display, unsaved), ", ")
+        question = question .. " " .. names .. (#unsaved == 1 and " has" or " have") .. " unsaved changes"
+      end
     end
-    if not yes(unsaved and (s.name .. " has unsaved changes. Kill anyway?") or ("Kill " .. s.name .. "?")) then
+    if not yes(question) then
       return
     end
   end
-  if s.current then
-    local prev = M.previous()
-    if prev then
-      if list then
-        remote(prev.sock, "require('sessman.buffer').open('')")
+  for _, x in ipairs(all) do
+    if x.current then
+      local prev = M.previous()
+      if prev then
+        if list then
+          remote(prev.sock, "require('sessman.buffer').open('')")
+        end
+        M.connect(prev.sock, false)
       end
-      M.connect(prev.sock, false)
+      vim.cmd("qall!")
+    elseif remote(x.sock, "vim.cmd('qall!')") then
+      vim.wait(2000, function()
+        return not uv.fs_stat(x.sock)
+      end, 10)
     end
-    vim.cmd("qall!")
-  elseif remote(s.sock, "vim.cmd('qall!')") then
-    vim.wait(2000, function()
-      return not uv.fs_stat(s.sock)
-    end, 10)
   end
 end
 
---- Remove a session's files, stopping it if it runs.
+--- Remove sessions' files (one or a list), stopping those that run.
 function M.delete(s)
-  if s.unmanaged then
+  local all = vim.tbl_filter(function(x)
+    return not x.unmanaged
+  end, batch(s))
+  if #all == 0 then
     return err("not a session: nothing to delete")
-  elseif not yes("Delete session " .. s.name .. "?") then
+  elseif not yes(#all == 1 and ("Delete session " .. all[1].name .. "?") or ("Delete %d sessions?"):format(#all)) then
     return
   end
-  -- It writes its ShaDa when it quits: point it back to the global one, or
-  -- the deleted file comes back
-  if s.current then
-    vim.o.shadafile = ""
-  elseif s.running then
-    remote(s.sock, "vim.o.shadafile = ''")
+  for _, x in ipairs(all) do
+    -- It writes its ShaDa when it quits: point it back to the global one, or
+    -- the deleted file comes back
+    if x.current then
+      vim.o.shadafile = ""
+    elseif x.running then
+      remote(x.sock, "vim.o.shadafile = ''")
+    end
+    os.remove(x.file)
+    os.remove(x.shada)
+    fn.delete(fs.dirname(x.file), "d") -- only if empty
   end
-  os.remove(s.file)
-  os.remove(s.shada)
-  fn.delete(fs.dirname(s.file), "d") -- only if empty
-  M.kill(s, true)
+  M.kill(all, true)
 end
 
 return M

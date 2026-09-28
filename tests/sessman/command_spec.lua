@@ -87,6 +87,22 @@ describe(":Session / :S", function()
     assert.matches("++shada only goes with save", last_error())
   end)
 
+  it(":%S kill stops every other running session, asking once", function()
+    vim.cmd("S new one")
+    vim.cmd("S new two")
+    local asked = env.stub_confirm(1)
+    vim.cmd("%S kill")
+    assert.same({ "Kill 2 sessions?" }, asked)
+    for _, s in ipairs(sessman.list()) do
+      assert.is_true(not s.running or s.current, s.name .. " still running")
+    end
+  end)
+
+  it("ignores a range with other subcommands (e.g. :'<,'> from visual mode)", function()
+    vim.cmd("1,1S switch coding")
+    assert.equals(sessman.session(env.project, "coding").sock, connects[1].addr)
+  end)
+
   it("rejects extra arguments", function()
     vim.cmd("Session switch a b")
     assert.matches("too many arguments", last_error())

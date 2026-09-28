@@ -101,6 +101,10 @@ subcommand. `:S` is the short form, like fugitive's `:G`; it isn't defined if
                         first, and says so if the session has unsaved
                         changes.
 
+:%Session kill          Kill every other running session and plain nvim,
+                        like |:detach| with "%" spares the current UI. One
+                        question for all of them.
+
                                                              *:Session-delete*
 :Session delete {target}
                         Kill {target} if it runs and remove its files.
@@ -189,6 +193,8 @@ X           Kill it: stop its server, keep its files. Killing the current
             session moves you to the previous one, with this list open,
             or quits.
 D           Delete it: remove its files, and kill it if it runs.
+{Visual}X   Kill the selected ones, with one question.
+{Visual}D   Delete the selected ones, with one question.
 co<Space>   Start `:Session switch ` on the command line.
 cn<Space>   Start `:Session new ` on the command line.
 cs<Space>   Start `:Session save ` on the command line.

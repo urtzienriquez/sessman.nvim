@@ -9,6 +9,7 @@ local opts = {
   nargs = "*",
   bang = true,
   bar = true,
+  range = true, -- :%S kill
   complete = function(arglead, cmdline)
     return require("sessman").complete(arglead, cmdline)
   end,
