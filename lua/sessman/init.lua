@@ -861,6 +861,13 @@ function M.delete(s)
   if s.unmanaged or fn.confirm("Delete session " .. s.name .. "?", "&Yes\n&No", 2) ~= 1 then
     return
   end
+  -- A running session writes its ShaDa when it quits: point it back to the
+  -- global one first, or the deleted file comes back
+  if s.current then
+    vim.o.shadafile = ""
+  elseif s.running then
+    remote(s.sock, "vim.o.shadafile = ''")
+  end
   os.remove(s.file)
   os.remove(s.shada)
   fn.delete(fs.dirname(s.file), "d") -- only if empty

@@ -195,6 +195,23 @@ describe("sessman://sessions", function()
     end, 10))
   end)
 
+  it("s asks before overwriting a saved session", function()
+    sessman.switch("coding") -- running, and saved as '" fake session'
+    local s = sessman.session(env.project, "coding")
+    vim.cmd("Session")
+    local asked = env.stub_confirm(2) -- No
+    goto_entry("Running", "coding")
+    env.feed("s")
+    assert.matches("Overwrite the saved session coding", asked[1])
+    vim.wait(300)
+    assert.same({ '" fake session' }, vim.fn.readfile(s.file))
+    env.stub_confirm(1) -- Yes
+    env.feed("s")
+    assert.is_true(vim.wait(2000, function()
+      return vim.fn.readfile(s.file)[1] ~= '" fake session'
+    end, 10))
+  end)
+
   it("navigates with ) ( ]] [[ and closes with gq", function()
     sessman.new("fresh")
     vim.cmd.edit(env.project .. "/a.txt")

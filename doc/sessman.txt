@@ -174,10 +174,11 @@ The highlight groups are `sessmanCurrent`, `sessmanUnsaved`, `sessmanUnnamed`,
 
                                                                 *sessman-maps*
 <CR>        Go to the session under the cursor.
-s           Save it (also a running session elsewhere). On this plain
-            nvim, start `:Session save ` for you to type its name. On a
-            session that isn't running, or another plain nvim, it says
-            what to do instead.
+s           Save it (also a running session elsewhere), asking first if
+            that overwrites its saved file. On this plain nvim, start
+            `:Session save ` for you to type its name. On a session that
+            isn't running, or another plain nvim, it says what to do
+            instead.
 S           Same with its own ShaDa |sessman-shada|: on this plain nvim it
             starts `:Session save ++shada `.
 X           Kill it: stop its server, keep its files. Killing the current

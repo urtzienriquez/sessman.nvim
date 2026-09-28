@@ -173,6 +173,10 @@ function M.read(buf)
 
   local function save(shada)
     return act(function(s)
+      local running = s.running and not s.unmanaged
+      if running and s.saved and fn.confirm("Overwrite the saved session " .. s.name .. "?", "&Yes\n&No", 2) ~= 1 then
+        return -- a key pressed by mistake shouldn't replace a saved session
+      end
       if s.current and s.unmanaged then
         -- Fill in the command, for the name: it shows how it's done
         api.nvim_feedkeys(shada and ":Session save ++shada " or ":Session save ", "ni", false)
@@ -181,7 +185,7 @@ function M.read(buf)
         if not api.nvim_buf_is_valid(buf) then
           M.open("") -- :mksession needed its window closed
         end
-      elseif not s.running or s.unmanaged then
+      elseif not running then
         local why = s.unmanaged and "not a session: go there (<CR>) and :Session save {name}"
           or (s.name .. " isn't running: go there (<CR>) to save it")
         api.nvim_echo({ { "sessman: " .. why } }, false, {})
