@@ -66,7 +66,7 @@ end
 function M.teardown()
   local sessman = require("sessman")
   for _, s in ipairs(sessman.list()) do
-    if s.running and not s.current and not s.unmanaged then
+    if s.server and not s.current and not s.plain then
       pcall(function()
         local chan = vim.fn.sockconnect("pipe", s.sock, { rpc = true })
         vim.rpcnotify(chan, "nvim_command", "qall!")
@@ -123,10 +123,10 @@ function M.stub_confirm(answer)
   return calls
 end
 
---- Replace sessman.connect; records calls.
+--- Replace sessman.connect_ui; records calls.
 function M.stub_connect()
   local calls = {}
-  require("sessman").connect = function(addr, stop)
+  require("sessman").connect_ui = function(addr, stop)
     calls[#calls + 1] = { addr = addr, stop = stop }
   end
   return calls

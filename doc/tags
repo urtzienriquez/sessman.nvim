@@ -1,12 +1,14 @@
 :S	sessman.txt	/*:S*
 :Session	sessman.txt	/*:Session*
+:Session-connect	sessman.txt	/*:Session-connect*
 :Session-delete	sessman.txt	/*:Session-delete*
-:Session-kill	sessman.txt	/*:Session-kill*
+:Session-load	sessman.txt	/*:Session-load*
 :Session-new	sessman.txt	/*:Session-new*
 :Session-save	sessman.txt	/*:Session-save*
-:Session-switch	sessman.txt	/*:Session-switch*
+:Session-stop	sessman.txt	/*:Session-stop*
 g:sessman_dir	sessman.txt	/*g:sessman_dir*
 g:sessman_exclude	sessman.txt	/*g:sessman_exclude*
+g:sessman_root_markers	sessman.txt	/*g:sessman_root_markers*
 g:sessman_session	sessman.txt	/*g:sessman_session*
 sessman	sessman.txt	/*sessman*
 sessman-api	sessman.txt	/*sessman-api*

@@ -25,7 +25,7 @@ describe(":Session save", function()
     assert.is_true(vim.tbl_contains(vim.fn.serverlist(), s.sock))
     assert.equals(1, vim.fn.filereadable(s.sock .. ".json"))
     local listed = sessman.resolve("mine", sessman.list())
-    assert.is_true(listed.current and listed.running and listed.saved)
+    assert.is_true(listed.current and listed.server and listed.saved)
   end)
 
   it("refuses to overwrite an existing session without !", function()

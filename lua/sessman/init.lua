@@ -1,24 +1,25 @@
---- Named sessions, either running (an Nvim server you :connect to) or saved
---- (a :mksession file), anchored to a project directory.
+--- Sessions (:mksession files) named project:name, and the Nvim servers that
+--- have them: connect to a session's server, starting one if none has it.
 --- The server half is adapted from servery.nvim (MIT, (c) servery.nvim authors).
 
 local M = {}
 
 local api, fn, fs, uv = vim.api, vim.fn, vim.fs, vim.uv
 
----@class sessman.Session
+--- A session and/or the server that has it; or a plain server (no session).
+---@class sessman.Entry
 ---@field project string|false Directory, false for global sessions
 ---@field name string
 ---@field file string
 ---@field shada string
 ---@field sock string
----@field saved? boolean
----@field running? boolean
+---@field saved? boolean Has a session file
+---@field server? boolean Has a server
 ---@field current? boolean
 ---@field mtime? integer
 ---@field cwd? string
 ---@field active? integer When a UI last left it
----@field unmanaged? boolean A plain nvim, not a session
+---@field plain? boolean A server without a session
 ---@field pid? integer
 
 local function err(msg)
@@ -45,9 +46,10 @@ local function abspath(path)
   return fs.normalize(fn.fnamemodify(fn.expand(path), ":p"))
 end
 
---- The git root of a directory, else the directory.
+--- The project of a directory: its root by g:sessman_root_markers (like LSP's
+--- root_markers), else the directory.
 local function root(path)
-  return fs.root(path, ".git") or path
+  return fs.root(path, vim.g.sessman_root_markers or { ".git" }) or path
 end
 
 -- Session directories: the project path with "/" -> "%", or "global"
@@ -65,7 +67,7 @@ end
 
 ---@param project string|false
 ---@param name string
----@return sessman.Session
+---@return sessman.Entry
 function M.session(project, name)
   local base = fs.joinpath(dir(), encode(project), name)
   return {
@@ -78,7 +80,7 @@ function M.session(project, name)
   }
 end
 
----@return sessman.Session? nil in a plain nvim
+---@return sessman.Entry? nil in a plain nvim
 function M.current()
   local id = vim.g.sessman_session
   return id and M.session(id.project, id.name) or nil
@@ -96,10 +98,10 @@ local function alive(addr)
   return false
 end
 
---- Plain nvim instances, one per pid.
+--- Servers without a session, one per pid.
 ---@param managed_pids table<integer, true>
----@return sessman.Session[]
-local function unmanaged(managed_pids)
+---@return sessman.Entry[]
+local function plain_servers(managed_pids)
   local ok, addrs = pcall(fn.serverlist, { peer = true })
   if not ok then
     return {}
@@ -112,10 +114,10 @@ local function unmanaged(managed_pids)
       seen[pid] = true
       local current = vim.tbl_contains(own, addr)
       out[#out + 1] = {
-        unmanaged = true,
+        plain = true,
         name = current and fn.getcwd() or uv.fs_readlink("/proc/" .. pid .. "/cwd") or ("pid " .. pid),
         sock = addr,
-        running = true,
+        server = true,
         current = current and not vim.g.sessman_session or nil,
       }
     end
@@ -123,9 +125,9 @@ local function unmanaged(managed_pids)
   return out
 end
 
---- Saved sessions (session dir), running ones (status files beside their
---- sockets) and plain nvims. Never blocks on a busy server.
----@return sessman.Session[]
+--- Sessions (session dir), servers that have one (status files beside their
+--- sockets) and plain servers. Never blocks on a busy server.
+---@return sessman.Entry[]
 function M.list()
   local by_key, out = {}, {}
   local function get(project, name)
@@ -158,7 +160,7 @@ function M.list()
       local ok, st = pcall(vim.json.decode, table.concat(fn.readfile(path)))
       if ok and type(st) == "table" and st.name and alive(sock) then
         local s = get(st.project, st.name)
-        s.running, s.cwd, s.active, s.pid = true, st.cwd, st.active, st.pid
+        s.server, s.cwd, s.active, s.pid = true, st.cwd, st.active, st.pid
         pids[st.pid] = true
       else -- stale
         os.remove(path)
@@ -174,9 +176,9 @@ function M.list()
   if cur and not by_key[(cur.project or "") .. "\0" .. cur.name] then
     -- Not on disk yet, e.g. while being adopted
     local s = get(cur.project, cur.name)
-    s.current, s.running = true, true
+    s.current, s.server = true, true
   end
-  return vim.list_extend(out, unmanaged(pids))
+  return vim.list_extend(out, plain_servers(pids))
 end
 
 --- The project you are in.
@@ -188,7 +190,7 @@ end
 --- The project an entry is listed under (a plain nvim's is its directory's).
 ---@return string|false
 function M.project_of(s)
-  if not s.unmanaged then
+  if not s.plain then
     return s.project
   end
   return s.name:sub(1, 1) == "/" and root(s.name) or s.name
@@ -198,7 +200,7 @@ end
 ---@return string
 function M.display(s)
   local project = M.project_of(s)
-  return (project and fn.fnamemodify(project, ":~") or "global") .. ":" .. (s.unmanaged and "(unnamed)" or s.name)
+  return (project and fn.fnamemodify(project, ":~") or "global") .. ":" .. (s.plain and "(no session)" or s.name)
 end
 
 --- "global", the directory name, or ~/path when directory names clash.
@@ -223,13 +225,13 @@ function M.label(s, here, sessions)
 end
 
 --- Resolve "name" or "project:name" to a session, possibly a new one.
----@return sessman.Session?
+---@return sessman.Entry?
 ---@return string? error
 function M.resolve(target, sessions)
   local proj, name = target:match("^(.*):([^:]+)$")
   local function find(project, n)
     for _, s in ipairs(sessions) do
-      if not s.unmanaged and s.project == project and s.name == n then
+      if not s.plain and s.project == project and s.name == n then
         return s
       end
     end
@@ -256,7 +258,7 @@ function M.resolve(target, sessions)
   -- A directory name: a project that has sessions, else a relative path
   local matches = {}
   for _, s in ipairs(sessions) do
-    if s.project and not s.unmanaged and fs.basename(s.project) == proj then
+    if s.project and not s.plain and fs.basename(s.project) == proj then
       matches[s.project] = true
     end
   end
@@ -271,7 +273,7 @@ function M.resolve(target, sessions)
   return nil, "unknown project: " .. proj
 end
 
-local subcommands = { "switch", "new", "save", "kill", "delete" }
+local subcommands = { "connect", "load", "new", "save", "stop", "delete" }
 
 local function filter(items, arglead)
   return arglead == "" and items or fn.matchfuzzy(items, arglead)
@@ -297,8 +299,14 @@ function M.complete(arglead, cmdline)
 
   -- Only what the subcommand can act on
   local wanted = ({
-    kill = function(s)
-      return s.running
+    connect = function(s)
+      return s.server
+    end,
+    load = function(s)
+      return s.saved and not s.server
+    end,
+    stop = function(s)
+      return s.server
     end,
     delete = function(s)
       return s.saved
@@ -314,14 +322,14 @@ function M.complete(arglead, cmdline)
   local here = M.here()
   local items = {}
   for _, s in ipairs(sessions) do
-    if not s.unmanaged and wanted(s) then
+    if not s.plain and wanted(s) then
       items[#items + 1] = M.label(s, here, sessions)
     end
   end
   table.sort(items)
   if words[1] == "save" and not args:find("++shada", 1, true) then
     table.insert(items, 1, "++shada")
-  elseif words[1] == "switch" then
+  elseif words[1] == "connect" then
     table.insert(items, 1, "-")
   end
   return filter(items, arglead)
@@ -353,29 +361,31 @@ function M.command(o)
     local s, msg = M.resolve(t, M.list())
     if not s then
       err(msg)
-    elseif not (s.running or s.saved) then
+    elseif not (s.server or s.saved) then
       err("no session " .. t)
       s = nil
     end
     return s
   end
 
-  if sub == "switch" then
-    return M.switch(target)
+  if sub == "connect" then
+    return M.connect(target)
+  elseif sub == "load" then
+    return M.load(target)
   elseif sub == "new" then
     return need_target() and M.new(target)
   elseif sub == "save" then
     return M.save(target, { bang = o.bang, shada = shada })
-  elseif sub == "kill" and o.range == 2 and not target then
-    -- :%S kill: every other running one, like :%detach spares this UI
+  elseif sub == "stop" and o.range == 2 and not target then
+    -- :%S stop: every other server, like :%detach spares this UI
     local others = vim.tbl_filter(function(x)
-      return x.running and not x.current
+      return x.server and not x.current
     end, M.list())
     if #others == 0 then
-      return err("no other running session")
+      return err("no other server")
     end
-    return M.kill(others)
-  elseif sub == "kill" then
+    return M.stop(others)
+  elseif sub == "stop" then
     local s
     if target then
       s = find(target)
@@ -384,7 +394,7 @@ function M.command(o)
         return x.current
       end)
     end
-    return s and M.kill(s)
+    return s and M.stop(s)
   elseif sub == "delete" then
     local s = need_target() and find(target)
     return s and M.delete(s)
@@ -392,12 +402,12 @@ function M.command(o)
   err(("unknown subcommand '%s' (%s)"):format(sub, table.concat(subcommands, ", ")))
 end
 
---- The running session left most recently, other than this one.
----@return sessman.Session?
+--- The server with a session left most recently, other than this one.
+---@return sessman.Entry?
 function M.previous(sessions)
   local best
   for _, s in ipairs(sessions or M.list()) do
-    if s.running and not s.current and not s.unmanaged and (not best or (s.active or 0) > (best.active or 0)) then
+    if s.server and not s.current and not s.plain and (not best or (s.active or 0) > (best.active or 0)) then
       best = s
     end
   end
@@ -464,9 +474,9 @@ end
 
 --- Move this UI to another server (:connect! stops the one we leave).
 --- Replaced in tests.
-function M.connect(addr, stop)
+function M.connect_ui(addr, stop_old)
   close_windows()
-  vim.cmd.connect({ args = { addr }, bang = stop })
+  vim.cmd.connect({ args = { addr }, bang = stop_old })
 end
 
 ---@return boolean ok
@@ -488,14 +498,14 @@ local function spawn(s)
     end
     vim.list_extend(cmd, { "-c", "source " .. fn.fnameescape(s.file) })
   end
-  vim.list_extend(cmd, { "-c", "lua require('sessman').attach()" })
+  vim.list_extend(cmd, { "-c", "lua require('sessman').serve()" })
 
   local cwd = fn.getcwd()
   if s.project and not (cwd == s.project or vim.startswith(cwd, s.project .. "/")) then
     cwd = fn.isdirectory(s.project) == 1 and s.project or cwd
   end
 
-  -- Ready once attach() wrote the status file, after sourcing the session
+  -- Ready once serve() wrote the status file, after sourcing the session
   local job = fn.jobstart(cmd, { detach = true, cwd = cwd, stdin = "null" })
   if job <= 0 or not vim.wait(5000, function()
     return uv.fs_stat(s.sock .. ".json") ~= nil
@@ -506,43 +516,38 @@ local function spawn(s)
   return true
 end
 
---- Go to s: jump if running, restore if saved, create otherwise.
+--- Connect to the server that has s, starting one (from its file, if any).
 ---@param opts? { ignore?: table<integer, true> } See disposable()
 function M.open(s, opts)
   local ignore = opts and opts.ignore
   if s.current then
     return
-  elseif not s.unmanaged and not valid(s.name) then
+  elseif not s.plain and not valid(s.name) then
     return err("invalid session name: " .. s.name)
   end
-  if s.running or spawn(s) then
-    M.connect(s.sock, disposable(ignore))
+  if s.server or spawn(s) then
+    M.connect_ui(s.sock, disposable(ignore))
   end
 end
 
---- vim.ui.select a session or plain nvim and go there, most recent first.
----@param running? boolean true: the running ones but this one; false: the others
-local function pick(running)
+--- vim.ui.select the other servers (kind "servers") or the sessions without
+--- one ("sessions"), most recent first, and connect / load.
+local function pick(kind)
+  local servers = kind == "servers"
   local items = vim.tbl_filter(function(s)
-    if running == nil then
-      return true
+    if servers then
+      return s.server and not s.current
     end
-    return running and (s.running and not s.current) or (not running and not s.running)
+    return not s.server
   end, M.list())
   if #items == 0 then
-    local what = running == nil and "session" or running and "other running session" or "saved session not running"
-    return err("no " .. what)
+    return err(servers and "no other server" or "no session without a server")
   end
 
-  -- Running sessions by when they were left (the first is `switch -`'s),
-  -- plain nvims, saved ones by last save; this one last
+  -- Servers by when they were left (the first is `connect -`'s), then plain
+  -- ones; sessions by last save
   local function key(s)
-    return {
-      s.current and 1 or 0,
-      s.unmanaged and 1 or s.running and 0 or 2,
-      -((s.running and s.active) or s.mtime or 0),
-      M.display(s),
-    }
+    return { s.plain and 1 or 0, -(s.active or s.mtime or 0), M.display(s) }
   end
   table.sort(items, function(a, b)
     local ka, kb = key(a), key(b)
@@ -561,13 +566,7 @@ local function pick(running)
     before[buf] = vim.bo[buf].buftype == "terminal" or nil
   end
 
-  vim.ui.select(items, {
-    prompt = running == nil and "Session " or running and "Running session " or "Saved session ",
-    format_item = function(s)
-      local label = M.display(s)
-      return s.current and (label .. "  (current)") or s.running and (label .. "  (running)") or label
-    end,
-  }, function(s)
+  vim.ui.select(items, { prompt = servers and "Server " or "Session ", format_item = M.display }, function(s)
     if not s then
       return
     end
@@ -581,41 +580,63 @@ local function pick(running)
   end)
 end
 
---- Go to a running or saved session ("-": the previous one). Without a
---- target, pick one; { running = true/false } narrows the picker.
----@param target? string|{ running?: boolean }
-function M.switch(target)
-  if type(target) ~= "string" then
-    return pick(target and target.running)
+--- :connect to the server that has session `target` ("-": the server left
+--- most recently); without a target, pick one.
+---@param target? string
+function M.connect(target)
+  if not target then
+    return pick("servers")
   end
   local sessions = M.list()
   local s, msg
   if target == "-" then
-    s, msg = M.previous(sessions), "no previous session"
+    s, msg = M.previous(sessions), "no previous server"
   else
     s, msg = M.resolve(target, sessions)
   end
   if not s then
     return err(msg)
-  elseif not (s.running or s.saved) then
+  elseif s.saved and not s.server then
+    return err(("%s has no server; to start one: :Session load %s"):format(target, target))
+  elseif not s.server then
     return err(("no session %s; to create it: :Session new %s"):format(target, target))
   end
   M.open(s)
 end
 
---- Create a session and go there.
-function M.new(target)
+--- Start a server from session `target`'s file and connect to it; without a
+--- target, pick one.
+---@param target? string
+function M.load(target)
+  if not target then
+    return pick("sessions")
+  end
   local s, msg = M.resolve(target, M.list())
   if not s then
     return err(msg)
-  elseif s.running or s.saved then
-    return err(("%s exists; to go there: :Session switch %s"):format(target, target))
+  elseif s.server then
+    return err(("%s has a server; to go there: :Session connect %s"):format(target, target))
+  elseif not s.saved then
+    return err(("no session %s; to create it: :Session new %s"):format(target, target))
   end
   M.open(s)
 end
 
---- In a session's server: listen on its socket and keep its status file.
-function M.attach()
+--- Start a server with a new session and connect to it.
+function M.new(target)
+  local s, msg = M.resolve(target, M.list())
+  if not s then
+    return err(msg)
+  elseif s.server or s.saved then
+    local verb = s.server and "connect" or "load"
+    return err(("%s exists; to go there: :Session %s %s"):format(target, verb, target))
+  end
+  M.open(s)
+end
+
+--- Make this server serve its session: listen on the session's socket and
+--- keep its status file.
+function M.serve()
   local s = M.current()
   if not s then
     return
@@ -749,14 +770,14 @@ function M.save(name, opts)
       return err(msg)
     elseif not valid(target.name) then
       return err("invalid session name: " .. target.name)
-    elseif target.running then
-      return err(target.name .. " is running; kill it first")
+    elseif target.server then
+      return err(target.name .. " has a server; stop it first")
     elseif target.saved and not opts.bang then
       return err(target.name .. " exists (add ! to override)")
     end
     s = target
     vim.g.sessman_session = { project = s.project, name = s.name }
-    M.attach()
+    M.serve()
   end
 
   close_windows()
@@ -789,7 +810,7 @@ end
 
 local UNSAVED = "return vim.iter(vim.api.nvim_list_bufs()):any(function(b) return vim.bo[b].modified end)"
 
---- Ask another running session to save itself.
+--- Ask another server to save its session.
 ---@param opts? { shada?: boolean }
 function M.save_remote(s, opts)
   remote(s.sock, ("require('sessman').save(nil, { shada = %s })"):format(opts and opts.shada and "true" or "false"))
@@ -810,14 +831,14 @@ local function batch(s)
   return out
 end
 
---- Stop running sessions (one or a list); their files stay. Stopping this one
---- moves the UI to the previous session (opening the list there if `list`),
+--- Stop servers (one entry or a list); session files stay. Stopping this one
+--- moves the UI to the previous server (opening the list there if `list`),
 --- or quits.
 ---@param force? boolean Don't ask
 ---@param list? boolean
-function M.kill(s, force, list)
+function M.stop(s, force, list)
   local all = vim.tbl_filter(function(x)
-    return x.running
+    return x.server
   end, batch(s))
   if #all == 0 then
     return
@@ -831,9 +852,9 @@ function M.kill(s, force, list)
     end, all)
     local question
     if #all == 1 then
-      question = #unsaved > 0 and (all[1].name .. " has unsaved changes. Kill anyway?") or ("Kill " .. all[1].name .. "?")
+      question = #unsaved > 0 and (all[1].name .. " has unsaved changes. Stop anyway?") or ("Stop " .. all[1].name .. "?")
     else
-      question = ("Kill %d sessions?"):format(#all)
+      question = ("Stop %d servers?"):format(#all)
       if #unsaved > 0 then
         local names = table.concat(vim.tbl_map(M.display, unsaved), ", ")
         question = question .. " " .. names .. (#unsaved == 1 and " has" or " have") .. " unsaved changes"
@@ -850,7 +871,7 @@ function M.kill(s, force, list)
         if list then
           remote(prev.sock, "require('sessman.buffer').open('')")
         end
-        M.connect(prev.sock, false)
+        M.connect_ui(prev.sock, false)
       end
       vim.cmd("qall!")
     elseif remote(x.sock, "vim.cmd('qall!')") then
@@ -861,10 +882,10 @@ function M.kill(s, force, list)
   end
 end
 
---- Remove sessions' files (one or a list), stopping those that run.
+--- Delete sessions (one entry or a list), stopping their servers.
 function M.delete(s)
   local all = vim.tbl_filter(function(x)
-    return not x.unmanaged
+    return not x.plain
   end, batch(s))
   if #all == 0 then
     return err("not a session: nothing to delete")
@@ -876,14 +897,14 @@ function M.delete(s)
     -- the deleted file comes back
     if x.current then
       vim.o.shadafile = ""
-    elseif x.running then
+    elseif x.server then
       remote(x.sock, "vim.o.shadafile = ''")
     end
     os.remove(x.file)
     os.remove(x.shada)
     fn.delete(fs.dirname(x.file), "d") -- only if empty
   end
-  M.kill(all, true)
+  M.stop(all, true)
 end
 
 return M

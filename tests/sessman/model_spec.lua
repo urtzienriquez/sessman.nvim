@@ -36,7 +36,7 @@ describe("model", function()
       env.write_session(false, "notes")
       local names = {}
       for _, s in ipairs(sessman.list()) do
-        if not s.unmanaged then
+        if not s.plain then
           names[#names + 1] = (s.project or "global") .. ":" .. s.name
           assert.is_true(s.saved)
           assert.is_number(s.mtime)
@@ -52,7 +52,7 @@ describe("model", function()
       env.write_session(env.project, "coding")
       vim.fn.writefile({}, sessman.session(env.project, "coding").shada)
       local managed = vim.tbl_filter(function(s)
-        return not s.unmanaged
+        return not s.plain
       end, sessman.list())
       assert.equals(1, #managed)
     end)
@@ -69,12 +69,12 @@ describe("model", function()
       assert.is_nil(vim.uv.fs_stat(s.sock))
     end)
 
-    it("marks this instance as a current unmanaged entry", function()
+    it("marks this instance as a current plain server", function()
       local cur = vim.tbl_filter(function(s)
         return s.current
       end, sessman.list())
       assert.equals(1, #cur)
-      assert.is_true(cur[1].unmanaged)
+      assert.is_true(cur[1].plain)
     end)
   end)
 
@@ -85,6 +85,15 @@ describe("model", function()
       assert.equals(env.project .. "/sub", sessman.here())
       vim.fn.mkdir(env.project .. "/.git", "p")
       assert.equals(env.project, sessman.here())
+    end)
+
+    it("uses g:sessman_root_markers, like LSP's root_markers", function()
+      vim.g.sessman_root_markers = { "DESCRIPTION" } -- an R package
+      vim.fn.writefile({}, env.project .. "/DESCRIPTION")
+      vim.fn.chdir(env.project .. "/sub")
+      assert.equals(env.project, sessman.here())
+      vim.g.sessman_root_markers = nil
+      assert.equals(env.project .. "/sub", sessman.here(), "no .git: the directory itself")
     end)
 
     it("isn't captured by a project with sessions higher up", function()
@@ -151,7 +160,7 @@ describe("model", function()
       local sessions = sessman.list()
       local here = sessman.here()
       for _, s in ipairs(sessions) do
-        if not s.unmanaged then
+        if not s.plain then
           local back = sessman.resolve(sessman.label(s, here, sessions), sessions)
           assert.equals(s.project, back.project)
           assert.equals(s.name, back.name)

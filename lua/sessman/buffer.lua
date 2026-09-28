@@ -22,11 +22,11 @@ end
 ---@param s sessman.Session
 local function details(s)
   local out = { s.current and "current" or nil }
-  if s.unmanaged then
+  if s.plain then
     return out[1] or ""
   end
-  out[#out + 1] = s.saved and ago(s.mtime or os.time()) or "unsaved"
-  if s.running and s.cwd and s.cwd ~= s.project then
+  out[#out + 1] = s.saved and ago(s.mtime or os.time()) or "not saved"
+  if s.server and s.cwd and s.cwd ~= s.project then
     local rel = s.project and vim.fs.relpath(s.project, s.cwd)
     out[#out + 1] = "in " .. (rel and (rel .. "/") or fn.fnamemodify(s.cwd, ":~"))
   end
@@ -37,24 +37,24 @@ local function pad(text, width)
   return text .. (" "):rep(width - fn.strdisplaywidth(text))
 end
 
---- Running and Saved sections, one project:name line per session: the
---- project you are in first, "global" last.
+--- Servers and Sessions (without a server) sections, one project:name line
+--- each: the project you are in first, "global" last.
 ---@param buf integer
 function M.render(buf)
   local sessman = require("sessman")
   local here = sessman.here()
 
   local labels, rank = {}, {}
-  local sections = { { title = "Running", list = {} }, { title = "Saved", list = {} } }
+  local sections = { { title = "Servers", list = {} }, { title = "Sessions", list = {} } }
   for _, s in ipairs(sessman.list()) do
     local project = sessman.project_of(s)
     labels[s], rank[s] = sessman.display(s), project == here and 0 or project and 1 or 2
-    table.insert(sections[s.running and 1 or 2].list, s)
+    table.insert(sections[s.server and 1 or 2].list, s)
   end
 
   local cur = sessman.current()
   local lines = {
-    "Session: " .. (cur and cur.name or "(unnamed)"),
+    "Session: " .. (cur and cur.name or "(no session)"),
     "Project: " .. fn.fnamemodify(here, ":~"),
     "Help:    g?",
   }
@@ -172,11 +172,11 @@ function M.read(buf)
 
   local function save(shada)
     return act(function(s)
-      local running = s.running and not s.unmanaged
-      if running and s.saved and fn.confirm("Overwrite the saved session " .. s.name .. "?", "&Yes\n&No", 2) ~= 1 then
+      local session_server = s.server and not s.plain
+      if session_server and s.saved and fn.confirm("Overwrite the saved session " .. s.name .. "?", "&Yes\n&No", 2) ~= 1 then
         return
       end
-      if s.current and s.unmanaged then
+      if s.current and s.plain then
         -- Fill in the command for the name: it teaches the command
         api.nvim_feedkeys(shada and ":Session save ++shada " or ":Session save ", "ni", false)
       elseif s.current then
@@ -184,9 +184,9 @@ function M.read(buf)
         if not api.nvim_buf_is_valid(buf) then
           M.open("") -- save() closed it
         end
-      elseif not running then
-        local why = s.unmanaged and "not a session: go there (<CR>) and :Session save {name}"
-          or (s.name .. " isn't running: go there (<CR>) to save it")
+      elseif not session_server then
+        local why = s.plain and "no session: go there (<CR>) and :Session save {name}"
+          or (s.name .. " has no server: connect to it (<CR>) to save it")
         api.nvim_echo({ { "sessman: " .. why } }, false, {})
       else
         sessman.save_remote(s, { shada = shada })
@@ -202,10 +202,10 @@ function M.read(buf)
   map("<CR>", act(sessman.open), "Go to session")
   map("s", save(false), "Save session")
   map("S", save(true), "Save session with ShaDa")
-  local function kill(s)
-    sessman.kill(s, false, true) -- reopen the list where we land
+  local function stop(s)
+    sessman.stop(s, false, true) -- reopen the list where we land
   end
-  map("X", act(kill), "Kill session")
+  map("X", act(stop), "Stop server")
   map("D", act(sessman.delete), "Delete session")
 
   --- Visual mode: an action on all the selected entries, then a refresh.
@@ -225,9 +225,10 @@ function M.read(buf)
       end
     end
   end
-  vim.keymap.set("x", "X", selected(kill), { buffer = buf, desc = "Kill the selected sessions" })
+  vim.keymap.set("x", "X", selected(stop), { buffer = buf, desc = "Stop the selected servers" })
   vim.keymap.set("x", "D", selected(sessman.delete), { buffer = buf, desc = "Delete the selected sessions" })
-  vim.keymap.set("n", "co<Space>", ":Session switch ", { buffer = buf, desc = "Populate :Session switch" })
+  vim.keymap.set("n", "co<Space>", ":Session connect ", { buffer = buf, desc = "Populate :Session connect" })
+  vim.keymap.set("n", "cl<Space>", ":Session load ", { buffer = buf, desc = "Populate :Session load" })
   vim.keymap.set("n", "cn<Space>", ":Session new ", { buffer = buf, desc = "Populate :Session new" })
   vim.keymap.set("n", "cs<Space>", ":Session save ", { buffer = buf, desc = "Populate :Session save" })
   map(")", function()

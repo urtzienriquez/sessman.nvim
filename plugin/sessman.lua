@@ -9,11 +9,11 @@ local opts = {
   nargs = "*",
   bang = true,
   bar = true,
-  range = true, -- :%S kill
+  range = true, -- :%S stop
   complete = function(arglead, cmdline)
     return require("sessman").complete(arglead, cmdline)
   end,
-  desc = "Sessions: list, switch, new, save, kill, delete",
+  desc = "Sessions and servers: list, connect, load, new, save, stop, delete",
 }
 local function command(o)
   require("sessman").command(o)
