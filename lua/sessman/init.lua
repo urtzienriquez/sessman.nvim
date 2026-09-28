@@ -314,11 +314,26 @@ function M.complete(arglead, cmdline)
     return fn.getcompletion(arglead, "dir")
   end
 
+  -- Only sessions the subcommand can act on
+  local wanted = ({
+    kill = function(s)
+      return s.running
+    end,
+    delete = function(s)
+      return s.saved
+    end,
+    save = function(s)
+      return s.saved
+    end,
+  })[words[1]] or function()
+    return true
+  end
+
   local sessions = M.list()
   local here = M.here()
   local items = {}
   for _, s in ipairs(sessions) do
-    if not s.unmanaged then
+    if not s.unmanaged and wanted(s) then
       items[#items + 1] = M.label(s, here, sessions)
     end
   end

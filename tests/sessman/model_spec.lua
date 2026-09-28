@@ -161,8 +161,8 @@ describe("model", function()
 
     it("completes labels, fuzzily", function()
       local all = { "coding", "global:notes", "other:coding", "other:review" }
-      assert.same(all, sessman.complete("", "Session kill "))
-      assert.same({ "other:review" }, sessman.complete("orev", "Session kill orev"))
+      assert.same(all, sessman.complete("", "Session delete "))
+      assert.same({ "other:review" }, sessman.complete("orev", "Session delete orev"))
     end)
   end)
 end)

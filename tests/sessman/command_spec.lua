@@ -93,9 +93,12 @@ describe(":Session / :S", function()
       assert.same({ "save" }, complete("S sa"))
     end)
 
-    it("completes sessions (and - for switch)", function()
-      assert.same({ "-", "coding" }, complete("Session switch "))
-      assert.same({ "coding" }, complete("vert Session kill "))
+    it("completes the sessions each subcommand can act on", function()
+      vim.cmd("S new fresh") -- running, never saved; coding is saved only
+      assert.same({ "-", "coding", "fresh" }, complete("Session switch "))
+      assert.same({ "fresh" }, complete("vert Session kill "))
+      assert.same({ "coding" }, complete("Session delete "))
+      assert.same({ "coding" }, complete("Session save "))
       assert.same({}, complete("Session switch coding "))
     end)
 
