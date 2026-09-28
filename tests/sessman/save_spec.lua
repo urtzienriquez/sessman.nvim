@@ -50,13 +50,17 @@ describe(":Session save", function()
     assert.matches("can't change", env.echoed[#env.echoed])
   end)
 
-  it("writes ShaDa only when asked or already in use", function()
+  it("writes ShaDa only when asked or already in use, and says so", function()
     sessman.save("mine")
     local s = sessman.current()
     assert.equals(0, vim.fn.filereadable(s.shada))
+    assert.equals("Saved session mine", env.echoed[#env.echoed])
     sessman.save(nil, { shada = true })
     assert.equals(1, vim.fn.filereadable(s.shada))
     assert.equals(s.shada, vim.o.shadafile)
+    assert.equals("Saved session mine with its ShaDa", env.echoed[#env.echoed])
+    sessman.save() -- it has one now: kept up to date
+    assert.equals("Saved session mine with its ShaDa", env.echoed[#env.echoed])
   end)
 
   it("never records the session buffer, even as the only window", function()

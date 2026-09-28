@@ -303,7 +303,9 @@ end
 function M.complete(arglead, cmdline)
   -- Arguments after the command name (:Session or :S; modifiers are lowercase)
   local args = (cmdline or ""):match("%f[%w]S%w*!?%s+(.*)$") or ""
-  local words = vim.split(args, "%s+", { trimempty = true })
+  local words = vim.tbl_filter(function(w)
+    return w ~= "++shada" -- an option, not a positional argument
+  end, vim.split(args, "%s+", { trimempty = true }))
   local position = #words + (arglead == "" and 1 or 0)
   if position <= 1 then
     return filter(subcommands, arglead)
@@ -337,7 +339,9 @@ function M.complete(arglead, cmdline)
     end
   end
   table.sort(items)
-  if words[1] == "switch" then
+  if words[1] == "save" and not args:find("++shada", 1, true) then
+    table.insert(items, 1, "++shada")
+  elseif words[1] == "switch" then
     table.insert(items, 1, "-")
   end
   return filter(items, arglead)
@@ -346,11 +350,19 @@ end
 --- The :Session command.
 ---@param o table Arguments of nvim_create_user_command's callback
 function M.command(o)
-  local sub, target = o.fargs[1], o.fargs[2]
+  -- ++shada (like :write ++enc): save with the session's own ShaDa
+  local shada = false
+  local args = vim.tbl_filter(function(a)
+    shada = shada or a == "++shada"
+    return a ~= "++shada"
+  end, o.fargs)
+  local sub, target = args[1], args[2]
   if not sub then
     return require("sessman.buffer").open(o.mods)
-  elseif #o.fargs > 2 then
+  elseif #args > 2 then
     return err("too many arguments")
+  elseif shada and sub ~= "save" then
+    return err("++shada only goes with save")
   end
 
   local function need_target()
@@ -375,7 +387,7 @@ function M.command(o)
   elseif sub == "new" then
     return need_target() and M.new(target)
   elseif sub == "save" then
-    return M.save(target, { bang = o.bang })
+    return M.save(target, { bang = o.bang, shada = shada })
   elseif sub == "kill" then
     if not target then
       for _, s in ipairs(M.list()) do
@@ -778,11 +790,12 @@ function M.save(name, opts)
   mksession(s.file)
 
   local shada_on = vim.o.shadafile ~= "" and abspath(vim.o.shadafile) == s.shada
-  if opts.shada or shada_on or uv.fs_stat(s.shada) then
+  local shada = opts.shada or shada_on or uv.fs_stat(s.shada) ~= nil
+  if shada then
     vim.cmd("wshada! " .. fn.fnameescape(s.shada))
     vim.o.shadafile = s.shada
   end
-  api.nvim_echo({ { "Saved session " .. s.name } }, false, {})
+  api.nvim_echo({ { "Saved session " .. s.name .. (shada and " with its ShaDa" or "") } }, false, {})
 end
 
 --- Run a Lua chunk in another server without waiting for it to finish.

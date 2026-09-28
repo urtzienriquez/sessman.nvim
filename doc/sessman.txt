@@ -83,6 +83,15 @@ subcommand. `:S` is the short form, like fugitive's `:G`; it isn't defined if
                         save it. Fails if {target} is already saved, unless
                         [!] is given. A session's name can't be changed.
 
+                                                               *sessman-shada*
+:Session save ++shada [target]
+                        Same, and give the session its own |shada| file
+                        (registers, marks, command history), like `:write
+                        ++enc` takes an option. Needed only once: every later
+                        save keeps it up to date, and the session starts with
+                        it when restored. Without it, sessions share your
+                        global ShaDa.
+
                                                                *:Session-kill*
 :Session kill [target]  Stop a running session: its server quits, its files
                         stay. Without [target], the current session: you
@@ -165,11 +174,15 @@ The highlight groups are `sessmanCurrent`, `sessmanUnsaved`, `sessmanUnnamed`,
 
                                                                 *sessman-maps*
 <CR>        Go to the session under the cursor.
-s           Save it (also a running session elsewhere). On the current
-            unnamed nvim, start `:Session save `.
-S           Save it and start or update its ShaDa file.
+s           Save it (also a running session elsewhere). On this plain
+            nvim, start `:Session save ` for you to type its name. On a
+            session that isn't running, or another plain nvim, it says
+            what to do instead.
+S           Same with its own ShaDa |sessman-shada|: on this plain nvim it
+            starts `:Session save ++shada `.
 X           Kill it: stop its server, keep its files. Killing the current
-            session moves you to the previous one, or quits.
+            session moves you to the previous one, with this list open,
+            or quits.
 D           Delete it: remove its files, and kill it if it runs.
 co<Space>   Start `:Session switch ` on the command line.
 cn<Space>   Start `:Session new ` on the command line.

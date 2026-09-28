@@ -244,6 +244,37 @@ describe("sessman://sessions", function()
     assert.equals("Project: " .. vim.fn.fnamemodify(env.root .. "/elsewhere", ":~"), first)
   end)
 
+  describe("s / S on this plain nvim", function()
+    --- The key fills in the command; the user types the name and <CR>.
+    local function press(key)
+      vim.cmd("Session")
+      goto_entry("Running", "(unnamed)")
+      env.feed(key .. "mine<CR>") -- as typed, or in a macro
+      return sessman.session(env.project, "mine")
+    end
+
+    it("s starts :Session save", function()
+      local s = press("s")
+      assert.equals(1, vim.fn.filereadable(s.file))
+      assert.equals(0, vim.fn.filereadable(s.shada))
+      assert.equals("mine", vim.g.sessman_session.name)
+    end)
+
+    it("S starts :Session save ++shada", function()
+      local s = press("S")
+      assert.equals(1, vim.fn.filereadable(s.shada))
+      assert.equals(s.shada, vim.o.shadafile)
+    end)
+  end)
+
+  it("s explains why it can't save a session that isn't running", function()
+    vim.cmd("Session")
+    goto_entry("Saved", "coding")
+    env.feed("s")
+    assert.matches("coding isn't running", env.echoed[#env.echoed])
+    assert.same({ '" fake session' }, vim.fn.readfile(sessman.session(env.project, "coding").file))
+  end)
+
   it(":edit re-reads it", function()
     vim.cmd("Session")
     env.write_session(env.project, "later")

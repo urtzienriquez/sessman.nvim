@@ -173,16 +173,19 @@ function M.read(buf)
 
   local function save(shada)
     return act(function(s)
-      if s.unmanaged then
-        if s.current then
-          api.nvim_feedkeys(":Session save ", "n", false)
-        end
+      if s.current and s.unmanaged then
+        -- Fill in the command, for the name: it shows how it's done
+        api.nvim_feedkeys(shada and ":Session save ++shada " or ":Session save ", "ni", false)
       elseif s.current then
         sessman.save(nil, { shada = shada })
         if not api.nvim_buf_is_valid(buf) then
-          M.open("") -- :mksession needed the window closed
+          M.open("") -- :mksession needed its window closed
         end
-      elseif s.running then
+      elseif not s.running or s.unmanaged then
+        local why = s.unmanaged and "not a session: go there (<CR>) and :Session save {name}"
+          or (s.name .. " isn't running: go there (<CR>) to save it")
+        api.nvim_echo({ { "sessman: " .. why } }, false, {})
+      else
         sessman.save_remote(s, { shada = shada })
         vim.defer_fn(function()
           if api.nvim_buf_is_valid(buf) then
