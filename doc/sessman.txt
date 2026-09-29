@@ -15,9 +15,9 @@ sessman combines two concepts that Nvim already provides:
 
   server    A running Nvim instance (|client-server|). The terminal only
             hosts a UI attached to the server; the server keeps running when
-            the UI detaches or the terminal is closed, together with its
-            buffers, undo history, |:terminal|s and jobs. A UI can be moved
-            to another server with |:connect|.
+            the UI detaches (and, if it has a session, when the terminal is
+            closed), together with its buffers, undo history, |:terminal|s
+            and jobs. A UI can be moved to another server with |:connect|.
 
 A server can have a session: the one it was loaded from, and that it writes
 when saved (see |v:this_session|). sessman gives each session a name of the
@@ -54,8 +54,14 @@ name: a server is addressed through the session it has.
 Requires Nvim 0.12+ (|:connect|) on a Unix-like system. Nothing but the
 `:Session` and `:S` commands and an autocommand is defined at startup.
 
-Tip: with Nvim 0.13+, `silent detach!` in your config keeps any plain nvim
-alive when its terminal closes, too (|:detach!|).
+Closing the terminal
+  A server that has a session keeps running when its terminal is closed,
+  whether or not the session has been saved: servers started by
+  |:Session-load| and |:Session-new| are headless, and a plain nvim given a
+  session with |:Session-save| is marked detachable (|:detach!|, Nvim 0.13+).
+  A plain nvim without a session ends with its terminal, as usual. To keep
+  every Nvim alive, put `silent! detach!` in your config; the ones left
+  behind are listed as "(no session)".
 
 ==============================================================================
 COMMANDS                                                    *sessman-commands*
