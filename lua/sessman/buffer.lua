@@ -126,6 +126,11 @@ function M.read(buf)
   M.render(buf)
   vim.bo[buf].filetype = "sessman"
 
+  local win = fn.bufwinid(buf)
+  if win ~= -1 then
+    vim.wo[win].spell = false
+  end
+
   api.nvim_create_autocmd("BufEnter", {
     buffer = buf,
     callback = function()
