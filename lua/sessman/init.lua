@@ -102,15 +102,16 @@ end
 ---@param managed_pids table<integer, true>
 ---@return sessman.Entry[]
 local function plain_servers(managed_pids)
-  local ok, addrs = pcall(fn.serverlist, { peer = true })
-  if not ok then
-    return {}
-  end
+  -- Not serverlist({ peer = true }): it waits for every server to answer
   local own = fn.serverlist()
+  local addrs = vim.list_extend({}, own)
+  for file, type in fs.dir(fn.stdpath("run")) do
+    addrs[#addrs + 1] = type == "socket" and fs.joinpath(fn.stdpath("run"), file) or nil
+  end
   local out, seen = {}, {}
   for _, addr in ipairs(addrs) do
     local pid = tonumber(fs.basename(addr):match("^nvim%.(%d+)%.%d+$"))
-    if pid and not seen[pid] and not managed_pids[pid] then
+    if pid and not seen[pid] and not managed_pids[pid] and alive(addr) then
       seen[pid] = true
       local current = vim.tbl_contains(own, addr)
       out[#out + 1] = {
@@ -545,6 +546,21 @@ local function pick(kind)
     return false
   end)
 
+  -- The name first, aligned, then the project
+  local function name(s)
+    return s.plain and "(no session)" or s.name
+  end
+  local width = 0
+  for _, s in ipairs(items) do
+    width = math.max(width, fn.strdisplaywidth(name(s)))
+  end
+  local function format(s)
+    local project = M.project_of(s)
+    return name(s)
+      .. (" "):rep(width - fn.strdisplaywidth(name(s)) + 3)
+      .. (project and fn.fnamemodify(project, ":~") or "global")
+  end
+
   -- A picker's own terminal (fzf-lua) is still running when it calls back:
   -- it mustn't keep this nvim alive
   local before = {}
@@ -552,7 +568,7 @@ local function pick(kind)
     before[buf] = vim.bo[buf].buftype == "terminal" or nil
   end
 
-  vim.ui.select(items, { prompt = servers and "Server " or "Session ", format_item = M.display }, function(s)
+  vim.ui.select(items, { prompt = servers and "Server " or "Session ", format_item = format }, function(s)
     if not s then
       return
     end

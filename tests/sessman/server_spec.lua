@@ -135,7 +135,7 @@ describe("servers", function()
       vim.cmd("runtime plugin/sessman.lua")
       local seen = capture()
       vim.cmd("S connect")
-      assert.same({ vim.fn.fnamemodify(env.project, ":~") .. ":fresh" }, seen.labels)
+      assert.same({ "fresh   " .. vim.fn.fnamemodify(env.project, ":~") }, seen.labels)
       assert.equals("Server ", seen.prompt)
     end)
 
@@ -153,7 +153,29 @@ describe("servers", function()
       local seen = capture()
       sessman.connect()
       vim.fn.jobstop(job)
-      assert.same({ vim.fn.fnamemodify(env.project .. "/sub", ":~") .. ":(no session)" }, seen.labels)
+      assert.same({ "(no session)   " .. vim.fn.fnamemodify(env.project .. "/sub", ":~") }, seen.labels)
+    end)
+
+    it("lists a plain server that never answers, without waiting for it", function()
+      local job = vim.fn.jobstart({
+        vim.v.progpath,
+        "--clean",
+        "--headless",
+        "--cmd",
+        [[call serverstart(printf('%s/nvim.%d.0', stdpath('run'), getpid()))]],
+        "--cmd",
+        "lua while true do end",
+      }, { cwd = env.project })
+      vim.wait(2000, function()
+        return #vim.fn.globpath(vim.fn.stdpath("run"), "nvim.*", false, true) > 0
+      end)
+      local others = vim.tbl_filter(function(s)
+        return not s.current
+      end, sessman.list())
+      vim.fn.jobstop(job)
+      assert.same({ env.project }, vim.tbl_map(function(s)
+        return s.name
+      end, others))
     end)
 
     it("load() offers the sessions without a server, as :S load does", function()
@@ -165,7 +187,7 @@ describe("servers", function()
       vim.cmd("S load")
       local labels = seen.labels
       table.sort(labels)
-      local expected = { "global:notes", vim.fn.fnamemodify(env.project, ":~") .. ":coding" }
+      local expected = { "notes    global", "coding   " .. vim.fn.fnamemodify(env.project, ":~") }
       table.sort(expected)
       assert.same(expected, labels)
       assert.equals("Session ", seen.prompt)
@@ -187,7 +209,7 @@ describe("servers", function()
       local p = vim.fn.fnamemodify(env.project, ":~")
       local seen = capture()
       sessman.connect()
-      assert.same({ p .. ":one", p .. ":two" }, seen.labels)
+      assert.same({ "one   " .. p, "two   " .. p }, seen.labels)
       assert.equals("one", sessman.previous().name)
     end)
 
@@ -198,7 +220,7 @@ describe("servers", function()
       local seen = capture()
       sessman.load()
       local p = vim.fn.fnamemodify(env.project, ":~")
-      assert.same({ p .. ":recent", p .. ":old" }, seen.labels)
+      assert.same({ "recent   " .. p, "old      " .. p }, seen.labels)
     end)
 
     it("says so when there is nothing to offer", function()

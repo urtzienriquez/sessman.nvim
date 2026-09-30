@@ -94,9 +94,10 @@ subcommand. `:S` is the short form, like fugitive's `:G`; it isn't defined if
 
 :Session connect        Pick one of the other servers with |vim.ui.select()|,
                         and so with any picker that replaces it (fzf-lua,
-                        telescope, snacks, mini.pick...), shown as
-                        `~/full/path:name`. Most recent first: the first is
-                        where `:Session connect -` goes; plain ones last.
+                        telescope, snacks, mini.pick...), shown as the
+                        session name and then its project. Most recent first:
+                        the first is where `:Session connect -` goes; plain
+                        ones last.
 
                                                                *:Session-load*
 :Session load {target}  Start a server that loads session {target} (like
